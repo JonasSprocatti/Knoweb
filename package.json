@@ -1,0 +1,32 @@
+{
+  "name": "teia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Teia — notas, gravações e transcrições conectadas numa teia de conhecimento, com análise pelo Claude.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.60.0",
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "next": "^15.3.0",
+    "openai": "^5.0.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-force-graph-2d": "^1.27.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.7.0"
+  }
+}
