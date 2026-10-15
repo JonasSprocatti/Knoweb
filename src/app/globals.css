@@ -4,34 +4,36 @@
    Tokens de cor — claro por padrão do sistema, escuro automático
    ------------------------------------------------------------------ */
 :root {
-  --bg: #f6f3ee;
-  --surface: #fbf9f5;
+  /* Dia: papel azulado, tinta violeta */
+  --bg: #eef0fb;
+  --surface: #e4e7f7;
   --panel: #ffffff;
-  --line: #e4ddd2;
-  --ink: #1f1b16;
-  --muted: #5f574c;
-  --faint: #9a9083;
-  --accent: #a8691a;
+  --line: #cdd2ee;
+  --ink: #161a44;
+  --muted: #464c84;
+  --faint: #6b71a3;
+  --accent: #5b3df5;
   --on-accent: #ffffff;
-  --topic: #2f7d73;
-  --rec: #d23c32;
-  --link: #8a4f0b;
+  --topic: #0f8f73;
+  --rec: #e23355;
+  --link: #4b30d9;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14120f;
-    --surface: #1a1814;
-    --panel: #201d18;
-    --line: #2f2b24;
-    --ink: #ece6dc;
-    --muted: #b3aa9c;
-    --faint: #7d7468;
-    --accent: #e0a64f;
-    --on-accent: #1a1408;
-    --topic: #6cc3b5;
-    --rec: #f0584d;
-    --link: #f0bd6e;
+    /* Noite: céu índigo, estrela pólen */
+    --bg: #0e1233;
+    --surface: #131845;
+    --panel: #1a2055;
+    --line: #2a3170;
+    --ink: #edefff;
+    --muted: #aab0da;
+    --faint: #7a82b6;
+    --accent: #ffd23f;
+    --on-accent: #1b1640;
+    --topic: #5ee6c3;
+    --rec: #ff5d73;
+    --link: #9dbeff;
   }
 }
 
@@ -48,8 +50,8 @@
   --color-topic: var(--topic);
   --color-rec: var(--rec);
   --color-link: var(--link);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-jb), ui-monospace, monospace;
+  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
 html,
@@ -60,18 +62,43 @@ body {
 
 body {
   -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Títulos de página: estreitos, pesados, em minúsculas. A personalidade do app mora aqui. */
+.display {
+  font-weight: 800;
+  font-stretch: 78%;
+  letter-spacing: -0.03em;
+  line-height: 0.92;
+  text-transform: lowercase;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ------------------------------------------------------------------
    Markdown renderizado
    ------------------------------------------------------------------ */
 .md {
-  line-height: 1.7;
+  line-height: 1.65;
+  max-width: 68ch;
   font-size: 1rem;
   overflow-wrap: anywhere;
 }

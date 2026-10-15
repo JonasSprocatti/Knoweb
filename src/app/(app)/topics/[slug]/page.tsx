@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { NoteCard } from "@/components/NoteCard";
+import { CoverPicker } from "@/components/CoverPicker";
+import { topicColor } from "@/lib/topicColor";
 import type { NoteListItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -10,12 +12,12 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
   const { slug } = await params;
   const supabase = await supabaseServer();
 
-  const { data: topic } = await supabase.from("topics").select("id, name, description").eq("slug", slug).maybeSingle();
+  const { data: topic } = await supabase.from("topics").select("id, name, slug, description, color, emoji, cover_path").eq("slug", slug).maybeSingle();
   if (!topic) notFound();
 
   const { data: rows } = await supabase
     .from("note_topics")
-    .select("relevance, notes(id, title, kind, status, summary, updated_at, duration_seconds, pinned)")
+    .select("relevance, notes(id, title, kind, status, summary, updated_at, duration_seconds, pinned, note_topics(relevance, topics(name, slug, color, emoji)))")
     .eq("topic_id", topic.id)
     .order("relevance", { ascending: false });
 
@@ -40,33 +42,37 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
-      <header className="flex flex-col gap-1">
-        <Link href="/topics" className="text-xs text-faint hover:text-accent">
-          ← Temas
+      <header className="flex flex-col gap-3">
+        <Link href="/topics" className="text-faint underline-offset-4 hover:text-ink hover:underline">
+          Todos os temas
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight text-topic">{topic.name}</h1>
-        {topic.description && <p className="text-sm text-muted">{topic.description}</p>}
+        <h1 className="display text-6xl md:text-7xl" style={{ color: `color-mix(in srgb, ${topicColor(topic)} 75%, var(--ink))` }}>
+          {topic.emoji && <span className="mr-3 align-middle text-5xl">{topic.emoji}</span>}
+          {topic.name}
+        </h1>
+        {topic.description && <p className="max-w-2xl text-lg text-muted">{topic.description}</p>}
+        <CoverPicker table="topics" id={topic.id} initialPath={topic.cover_path} />
       </header>
 
       {related.length > 0 && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-xs text-faint">Aparece junto com:</span>
+          <span className="mr-1 text-faint">Aparece junto com</span>
           {related.map((t) => (
-            <Link key={t.slug} href={`/topics/${t.slug}`} className="rounded-full border border-line px-2.5 py-0.5 text-xs text-muted hover:border-topic hover:text-topic">
-              {t.name} <span className="opacity-60">{t.count}</span>
+            <Link key={t.slug} href={`/topics/${t.slug}`} className="rounded-full bg-panel px-3 py-0.5 text-muted hover:text-ink">
+              {t.name} <span className="text-faint">{t.count}</span>
             </Link>
           ))}
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-x-10 lg:grid-cols-2">
         {notes.map((n) => (
           <NoteCard key={n.id} note={n} />
         ))}
       </div>
 
-      <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="self-start text-sm text-accent hover:underline">
-        Perguntar ao Claude sobre este tema →
+      <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="self-start rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:brightness-110">
+        Perguntar ao Claude sobre este tema
       </Link>
     </div>
   );

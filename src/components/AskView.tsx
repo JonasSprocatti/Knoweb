@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
-import { Icon } from "@/components/Icon";
 
 type Msg = { role: "user" | "assistant"; content: string; sources?: { id: string; title: string }[] };
 
@@ -77,10 +76,10 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-10rem)] max-w-3xl flex-col">
       <header className="mb-6">
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <Icon name="sparkle" className="h-6 w-6 text-accent" /> Perguntar à teia
+        <h1 className="display text-6xl md:text-7xl">
+          Perguntar<span className="text-accent">?</span>
         </h1>
-        <p className="text-sm text-muted">O Claude responde usando só as suas notas e transcrições, e cita de onde tirou.</p>
+        <p className="mt-3 text-lg text-muted">O Claude responde usando só as suas notas e transcrições, e cita de onde tirou.</p>
       </header>
 
       <div className="flex flex-1 flex-col gap-5">
@@ -90,7 +89,7 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
               <button
                 key={ex}
                 onClick={() => ask(ex)}
-                className="rounded-xl border border-line bg-panel p-3 text-left text-sm text-muted transition hover:border-accent hover:text-ink"
+                className="rounded-2xl bg-panel p-4 text-left text-muted transition hover:text-ink hover:ring-2 hover:ring-accent"
               >
                 {ex}
               </button>
@@ -100,7 +99,7 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
 
         {messages.map((m, i) =>
           m.role === "user" ? (
-            <div key={i} className="self-end rounded-2xl rounded-br-md bg-accent/15 px-4 py-2.5 text-ink">
+            <div key={i} className="max-w-[85%] self-end rounded-3xl rounded-br-md bg-panel px-4 py-2.5 text-lg text-ink">
               {m.content}
             </div>
           ) : (
@@ -135,7 +134,7 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
           e.preventDefault();
           ask(input);
         }}
-        className="sticky bottom-24 mt-6 flex items-end gap-2 rounded-2xl border border-line bg-panel p-2 shadow-lg md:bottom-4"
+        className="sticky bottom-24 mt-6 flex items-end gap-2 rounded-3xl bg-panel p-2 ring-1 ring-line md:bottom-4"
       >
         <textarea
           value={input}
@@ -152,9 +151,9 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
         />
         <button
           disabled={busy || !input.trim()}
-          className="rounded-xl bg-accent px-3 py-2 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-40"
+          className="rounded-full bg-accent px-4 py-2 font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-40"
         >
-          {busy ? "…" : "Enviar"}
+          {busy ? "Pensando…" : "Perguntar"}
         </button>
       </form>
     </div>

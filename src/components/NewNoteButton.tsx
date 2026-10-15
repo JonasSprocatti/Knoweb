@@ -21,7 +21,7 @@ export function NewNoteButton({ className = "", label = "Nova nota" }: { classNa
           setBusy(false);
         }
       }}
-      className={`inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-60 ${className}`}
+      className={`inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-60 ${className}`}
     >
       <Icon name="plus" className="h-4 w-4" />
       {label}

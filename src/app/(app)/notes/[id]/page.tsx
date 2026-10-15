@@ -28,7 +28,7 @@ export default async function NotePage({
 
   const [{ data: segments }, { data: topics }, { data: outgoing }, { data: incoming }] = await Promise.all([
     supabase.from("audio_segments").select("*").eq("note_id", id).order("seq"),
-    supabase.from("note_topics").select("relevance, source, topics(id, name, slug)").eq("note_id", id).order("relevance", { ascending: false }),
+    supabase.from("note_topics").select("relevance, source, topics(id, name, slug, color, emoji)").eq("note_id", id).order("relevance", { ascending: false }),
     supabase.from("note_links").select("target_id, kind, reason, notes!note_links_target_id_fkey(id, title)").eq("source_id", id),
     supabase.from("note_links").select("source_id, kind, reason, notes!note_links_source_id_fkey(id, title)").eq("target_id", id),
   ]);
@@ -38,7 +38,7 @@ export default async function NotePage({
 
   const noteTopics: NoteTopic[] = (topics ?? [])
     .map((t) => {
-      const topic = one(t.topics as unknown as Joined) as unknown as { id: string; name: string; slug: string } | undefined;
+      const topic = one(t.topics as unknown as Joined) as unknown as Omit<NoteTopic, "relevance" | "source"> | undefined;
       return topic ? { ...topic, relevance: t.relevance as number, source: t.source as "ai" | "manual" } : null;
     })
     .filter((t): t is NoteTopic => !!t);

@@ -106,7 +106,7 @@ export function WikiEditor({
       {query !== null && options.length > 0 && (
         // Fixo no topo da tela: fica visível mesmo com o teclado do celular aberto
         <ul className="fixed inset-x-4 top-16 z-40 max-h-64 overflow-auto rounded-lg border border-line bg-surface py-1 shadow-xl md:inset-x-auto md:right-8 md:top-8 md:w-80">
-          <li className="px-3 pb-1 pt-0.5 text-[11px] uppercase tracking-wider text-faint">Ligar a</li>
+          <li className="px-3 pb-1 pt-0.5 text-sm text-faint">Ligar a</li>
           {options.map((t, i) => {
             const isCreate = showCreate && i === options.length - 1;
             return (

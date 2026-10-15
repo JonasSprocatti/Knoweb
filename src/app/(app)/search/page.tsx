@@ -30,14 +30,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-5">
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Busca</h1>
+        <h1 className="display text-6xl md:text-7xl">Busca</h1>
         <form action="/search" className="mt-3">
           <input
             name="q"
             defaultValue={q}
             autoFocus
             placeholder="Palavras, frases entre aspas, -excluir…"
-            className="w-full rounded-xl border border-line bg-panel px-4 py-3 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
+            className="w-full rounded-full bg-panel px-5 py-3 text-lg text-ink placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </form>
       </header>

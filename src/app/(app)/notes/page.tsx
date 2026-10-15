@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { NoteCard } from "@/components/NoteCard";
+import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";
 import { NewNoteButton } from "@/components/NewNoteButton";
 import type { NoteListItem } from "@/lib/types";
 
@@ -22,7 +22,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
 
   let query = supabase
     .from("notes")
-    .select("id, title, kind, status, summary, updated_at, duration_seconds, pinned", { count: "exact" })
+    .select(LIST_COLUMNS, { count: "exact" })
     .order("updated_at", { ascending: false })
     .range((page - 1) * perPage, page * perPage - 1);
 
@@ -34,9 +34,9 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / perPage));
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Notas</h1>
+    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <h1 className="display text-6xl md:text-7xl">Notas</h1>
         <NewNoteButton />
       </header>
 
@@ -45,20 +45,21 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
           <Link
             key={f.key}
             href={f.key ? `/notes?tipo=${f.key}` : "/notes"}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              tipo === f.key ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:text-ink"
-            }`}
+            aria-current={tipo === f.key ? "page" : undefined}
+            className={`rounded-full px-3.5 py-1 transition ${tipo === f.key ? "bg-ink text-bg" : "text-muted hover:bg-panel hover:text-ink"}`}
           >
             {f.label}
           </Link>
         ))}
-        <span className="ml-auto self-center text-xs text-faint">{count ?? 0} notas</span>
+        <span className="ml-auto self-center text-faint">
+          {count ?? 0} {count === 1 ? "nota" : "notas"}
+        </span>
       </div>
 
       {(data ?? []).length === 0 ? (
-        <p className="rounded-xl border border-dashed border-line p-8 text-center text-sm text-muted">Nada por aqui ainda.</p>
+        <p className="py-6 text-muted">Nenhuma nota neste filtro. Escreva uma nova ou grave uma conversa.</p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-x-10 lg:grid-cols-2">
           {(data as NoteListItem[]).map((n) => (
             <NoteCard key={n.id} note={n} />
           ))}
@@ -68,16 +69,16 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
       {totalPages > 1 && (
         <nav className="flex items-center justify-center gap-3 text-sm">
           {page > 1 && (
-            <Link href={`/notes?${new URLSearchParams({ ...(tipo ? { tipo } : {}), pagina: String(page - 1) })}`} className="text-accent">
-              ← anterior
+            <Link href={`/notes?${new URLSearchParams({ ...(tipo ? { tipo } : {}), pagina: String(page - 1) })}`} className="text-link hover:underline">
+              Anteriores
             </Link>
           )}
           <span className="text-faint">
             {page} / {totalPages}
           </span>
           {page < totalPages && (
-            <Link href={`/notes?${new URLSearchParams({ ...(tipo ? { tipo } : {}), pagina: String(page + 1) })}`} className="text-accent">
-              próxima →
+            <Link href={`/notes?${new URLSearchParams({ ...(tipo ? { tipo } : {}), pagina: String(page + 1) })}`} className="text-link hover:underline">
+              Mais antigas
             </Link>
           )}
         </nav>

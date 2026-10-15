@@ -184,6 +184,28 @@ create policy "audio_own_delete" on storage.objects for delete
   using (bucket_id = 'audio' and (storage.foldername(name))[1] = auth.uid()::text);
 
 -- ---------------------------------------------------------------------
+-- Visual da teia: imagens nos pontos e emoji dos temas
+-- ---------------------------------------------------------------------
+alter table public.notes  add column if not exists cover_path text;
+alter table public.topics add column if not exists cover_path text;
+alter table public.topics add column if not exists emoji text;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('images', 'images', false, 5242880, array['image/png', 'image/jpeg', 'image/webp', 'image/gif'])  -- 5 MB
+on conflict (id) do nothing;
+
+drop policy if exists "images_own_select" on storage.objects;
+drop policy if exists "images_own_insert" on storage.objects;
+drop policy if exists "images_own_delete" on storage.objects;
+
+create policy "images_own_select" on storage.objects for select
+  using (bucket_id = 'images' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "images_own_insert" on storage.objects for insert
+  with check (bucket_id = 'images' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "images_own_delete" on storage.objects for delete
+  using (bucket_id = 'images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------
 -- Realtime: a nota atualiza sozinha no outro dispositivo
 -- ---------------------------------------------------------------------
 do $$

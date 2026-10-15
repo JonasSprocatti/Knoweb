@@ -21,12 +21,16 @@ export interface Note {
   insights: Insights;
   duration_seconds: number;
   pinned: boolean;
+  cover_path?: string | null;
   analyzed_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type NoteListItem = Pick<Note, "id" | "title" | "kind" | "status" | "summary" | "updated_at" | "duration_seconds" | "pinned">;
+export type NoteListItem = Pick<Note, "id" | "title" | "kind" | "status" | "summary" | "updated_at" | "duration_seconds" | "pinned"> & {
+  /** Temas da nota, quando a consulta traz (usado para a cor) */
+  note_topics?: { relevance: number; topics: unknown }[];
+};
 
 export interface AudioSegment {
   id: string;
@@ -48,6 +52,8 @@ export interface Topic {
   slug: string;
   description: string | null;
   color: string | null;
+  emoji?: string | null;
+  cover_path?: string | null;
 }
 
 export interface TopicWithCount extends Topic {
@@ -60,6 +66,12 @@ export interface GraphNode {
   type: "note" | "recording" | "topic";
   weight: number;
   slug?: string;
+  /** Cor do tema (ou do tema principal da nota) */
+  color: string;
+  emoji?: string | null;
+  /** URL assinada da imagem do ponto, válida por algumas horas */
+  image?: string | null;
+  created_at: string;
 }
 
 export interface GraphLink {

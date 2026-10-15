@@ -54,43 +54,48 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
   return (
     <div className="flex min-h-dvh">
       {/* ---------------- Barra lateral (desktop) ---------------- */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 md:flex">
-        <Link href="/" className="mb-5 flex items-center gap-2 px-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/icon.svg" alt="" className="h-7 w-7" />
-          <span className="text-lg font-bold tracking-tight">Knoweb</span>
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col px-5 py-7 md:flex">
+        <Link href="/" className="display mb-8 flex items-start gap-1 text-5xl text-ink">
+          knoweb
+          <span className="text-2xl text-accent" aria-hidden>
+            ✦
+          </span>
         </Link>
 
         <form onSubmit={search} className="mb-3">
-          <label className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-sm focus-within:border-accent">
+          <label className="flex items-center gap-2 rounded-full bg-panel px-3.5 py-2 focus-within:ring-2 focus-within:ring-accent">
             <Icon name="search" className="h-4 w-4 text-faint" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar…"
+              placeholder="Buscar nas notas"
               className="w-full bg-transparent text-ink placeholder:text-faint focus:outline-none"
             />
           </label>
         </form>
 
-        <NewNoteButton className="mb-4 justify-center" />
+        <NewNoteButton className="mb-8 justify-center" />
 
-        <nav className="flex flex-col gap-0.5">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm transition ${
-                isActive(path, item.href) ? "bg-panel font-medium text-ink shadow-sm" : "text-muted hover:bg-panel/60 hover:text-ink"
-              }`}
-            >
-              <Icon name={item.icon} className={`h-[18px] w-[18px] ${item.href === "/record" ? "text-rec" : ""}`} />
-              {item.label}
-            </Link>
-          ))}
+        <nav className="flex flex-col gap-1 text-lg">
+          {NAV.map((item) => {
+            const active = isActive(path, item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center gap-2.5 py-1 transition ${active ? "font-semibold text-ink" : "text-muted hover:text-ink"}`}
+              >
+                <span className={`w-4 text-center text-sm ${item.href === "/record" ? "text-rec" : "text-accent"}`} aria-hidden>
+                  {active ? "✦" : item.href === "/record" ? "●" : ""}
+                </span>
+                {item.label}
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line px-2 pt-3 text-xs text-faint">
+        <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-sm text-faint">
           <span className="truncate" title={email}>
             {email}
           </span>
@@ -106,18 +111,17 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       {/* ---------------- Conteúdo ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topo (celular) */}
-        <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-bg/90 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
-          <Link href="/" className="shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="Knoweb" className="h-7 w-7" />
+        <header className="sticky top-0 z-20 flex items-center gap-3 bg-bg/90 px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
+          <Link href="/" className="display shrink-0 text-3xl text-ink" aria-label="Knoweb, início">
+            kw<span className="text-accent">✦</span>
           </Link>
-          <form onSubmit={search} className="flex-1">
-            <label className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-sm">
+          <form onSubmit={search} className="min-w-0 flex-1">
+            <label className="flex items-center gap-2 rounded-full bg-panel px-3 py-1.5">
               <Icon name="search" className="h-4 w-4 text-faint" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Buscar na teia…"
+                placeholder="Buscar"
                 className="w-full bg-transparent text-ink placeholder:text-faint focus:outline-none"
               />
             </label>
@@ -126,11 +130,11 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
           <NewNoteButton label="" className="px-2.5" />
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8">{children}</main>
+        <main className="flex-1 px-4 pb-28 pt-5 md:px-10 md:pb-12 md:pt-10">{children}</main>
       </div>
 
       {/* ---------------- Navegação inferior (celular) ---------------- */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {MOBILE_NAV.map((href) => {
             const item = NAV.find((n) => n.href === href)!;
@@ -138,7 +142,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
             if (href === "/record") {
               return (
                 <Link key={href} href={href} className="flex flex-col items-center justify-center py-1.5" aria-label="Gravar">
-                  <span className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-rec text-white shadow-lg shadow-rec/30">
+                  <span className="-mt-6 flex h-15 w-15 items-center justify-center rounded-full bg-rec text-white ring-4 ring-bg">
                     <Icon name="mic" className="h-6 w-6" />
                   </span>
                 </Link>
@@ -148,9 +152,10 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
               <Link
                 key={href}
                 href={href}
-                className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${active ? "text-accent" : "text-faint"}`}
+                aria-current={active ? "page" : undefined}
+                className={`flex flex-col items-center gap-0.5 py-2 text-xs ${active ? "font-semibold text-ink" : "text-faint"}`}
               >
-                <Icon name={item.icon} className="h-5 w-5" />
+                <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-accent" : ""}`} />
                 {item.label}
               </Link>
             );

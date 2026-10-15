@@ -13,11 +13,15 @@ import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/NoteCard";
 import { WikiEditor } from "@/components/WikiEditor";
 import { Transcript } from "@/components/Transcript";
+import { TopicChip } from "@/components/TopicChip";
+import { CoverPicker } from "@/components/CoverPicker";
 
 export interface NoteTopic {
   id: string;
   name: string;
   slug: string;
+  color?: string | null;
+  emoji?: string | null;
   relevance: number;
   source: "ai" | "manual";
 }
@@ -210,14 +214,15 @@ export function NoteView({
   const hasAnalysis = !!note.summary;
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
       {/* ===================== Coluna principal ===================== */}
       <article className="flex min-w-0 flex-col gap-5">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-faint">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-faint">
           <Icon name={note.kind === "recording" ? "wave" : "notes"} className={`h-4 w-4 ${note.kind === "recording" ? "text-rec" : ""}`} />
-          <span>{note.kind === "recording" ? "Gravação" : "Nota"}</span>
-          <span>· criada {relativeDate(note.created_at)}</span>
-          {note.duration_seconds > 0 && <span>· {formatDuration(note.duration_seconds)}</span>}
+          <span>
+            {note.kind === "recording" ? "Gravação" : "Nota"} criada {relativeDate(note.created_at)}
+          </span>
+          {note.duration_seconds > 0 && <span>{formatDuration(note.duration_seconds)} de áudio</span>}
           <StatusBadge status={note.status} />
           <span className="ml-auto flex items-center gap-1">
             <span className="mr-2">
@@ -239,24 +244,26 @@ export function NoteView({
             save({ title: e.target.value, content });
           }}
           placeholder="Título"
-          className="w-full bg-transparent text-2xl font-bold leading-tight tracking-tight text-ink placeholder:text-faint focus:outline-none md:text-3xl"
+          className="w-full bg-transparent text-4xl font-extrabold leading-[1.05] tracking-tight text-ink [font-stretch:85%] placeholder:text-faint focus:outline-none md:text-5xl"
         />
 
         <section className="flex flex-col gap-2">
-          <div className="flex items-center gap-1 text-xs">
+          <div className="flex items-center gap-1 text-sm">
             <button
               onClick={() => setEditing(false)}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 ${!editing ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+              aria-pressed={!editing}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${!editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
             >
               <Icon name="eye" className="h-3.5 w-3.5" /> Ler
             </button>
             <button
               onClick={() => setEditing(true)}
-              className={`flex items-center gap-1 rounded-md px-2 py-1 ${editing ? "bg-panel text-ink shadow-sm" : "text-muted hover:text-ink"}`}
+              aria-pressed={editing}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
             >
               <Icon name="edit" className="h-3.5 w-3.5" /> Editar
             </button>
-            <span className="ml-2 hidden text-faint sm:inline">Markdown · [[ para ligar notas</span>
+            <span className="ml-3 hidden text-faint sm:inline">Escreva em Markdown. Digite [[ para ligar outra nota.</span>
           </div>
 
           {editing ? (
@@ -276,7 +283,7 @@ export function NoteView({
           ) : (
             <button
               onClick={() => setEditing(true)}
-              className="rounded-xl border border-dashed border-line p-4 text-left text-sm text-faint hover:border-accent hover:text-muted"
+              className="rounded-2xl border border-dashed border-line p-4 text-left text-faint hover:border-accent hover:text-muted"
             >
               {note.kind === "recording" ? "Adicionar anotações próprias a esta gravação…" : "Escreva algo…"}
             </button>
@@ -295,15 +302,18 @@ export function NoteView({
 
       {/* ===================== Painel do Claude ===================== */}
       <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-6">
-        <section className="rounded-2xl border border-line bg-panel p-4">
+        <section className="rounded-3xl bg-panel p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-              <Icon name="sparkle" className="h-4 w-4 text-accent" /> Análise
+            <h2 className="flex items-center gap-1.5 text-xl font-bold tracking-tight">
+              <span className="text-accent" aria-hidden>
+                ✦
+              </span>
+              Análise do Claude
             </h2>
             <button
               onClick={runAnalysis}
               disabled={busy || processing}
-              className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-ink disabled:opacity-50"
+              className="rounded-full bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink disabled:opacity-50"
             >
               {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar"}
             </button>
@@ -318,7 +328,7 @@ export function NoteView({
               <InsightList label="Pontos-chave" items={insights.key_points} />
               {insights.action_items && insights.action_items.length > 0 && (
                 <div>
-                  <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-faint">Próximos passos</h3>
+                  <h3 className="mb-1.5 font-semibold text-ink">Próximos passos</h3>
                   <ul className="flex flex-col gap-1.5">
                     {insights.action_items.map((a, i) => (
                       <li key={i} className="flex gap-2">
@@ -336,7 +346,7 @@ export function NoteView({
               <InsightList label="Perguntas em aberto" items={insights.questions} />
               {insights.people && insights.people.length > 0 && (
                 <p className="text-xs text-muted">
-                  <span className="font-semibold uppercase tracking-wider text-faint">Pessoas: </span>
+                  <span className="font-semibold text-ink">Pessoas: </span>
                   {insights.people.join(", ")}
                 </p>
               )}
@@ -349,33 +359,33 @@ export function NoteView({
         </section>
 
         <section>
-          <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-faint">Temas</h2>
-          <div className="flex flex-wrap gap-1.5">
+          <h2 className="mb-2 text-xl font-bold tracking-tight">Temas</h2>
+          <div className="flex flex-wrap gap-2">
             {topics.map((t) => (
-              <span
-                key={t.id}
-                className="group inline-flex items-center gap-1 rounded-full border border-topic/30 bg-topic/10 py-0.5 pl-2.5 pr-1 text-xs text-topic"
-              >
-                <Link href={`/topics/${t.slug}`} className="hover:underline">
-                  {t.name}
-                </Link>
-                <button onClick={() => removeTopic(t.id)} className="rounded-full p-0.5 opacity-50 hover:opacity-100" aria-label={`Remover ${t.name}`}>
+              <TopicChip key={t.id} topic={t}>
+                <button onClick={() => removeTopic(t.id)} className="-mr-1 rounded-full p-0.5 text-faint hover:text-ink" aria-label={`Remover ${t.name}`}>
                   <Icon name="x" className="h-3 w-3" />
                 </button>
-              </span>
+              </TopicChip>
             ))}
             <form onSubmit={addTopic}>
               <input
                 value={newTopic}
                 onChange={(e) => setNewTopic(e.target.value)}
                 placeholder="+ tema"
-                className="w-24 rounded-full border border-dashed border-line bg-transparent px-2.5 py-0.5 text-xs text-ink placeholder:text-faint focus:w-36 focus:border-topic focus:outline-none"
+                aria-label="Adicionar tema"
+                className="w-28 rounded-full border border-dashed border-line bg-transparent px-3 py-0.5 text-sm text-ink placeholder:text-faint focus:w-40 focus:border-accent focus:outline-none"
               />
             </form>
           </div>
         </section>
 
-        <LinkGroup label="Relacionadas (Claude)" links={aiLinks} showReason />
+        <section>
+          <h2 className="mb-2 text-xl font-bold tracking-tight">Imagem na teia</h2>
+          <CoverPicker table="notes" id={note.id} initialPath={note.cover_path ?? null} />
+        </section>
+
+        <LinkGroup label="Relacionadas pelo Claude" links={aiLinks} showReason />
         <LinkGroup label="Links" links={outLinks} />
         <LinkGroup label="Mencionada em" links={backlinks} />
       </aside>
@@ -400,7 +410,7 @@ function InsightList({ label, items }: { label: string; items?: string[] }) {
   if (!items || items.length === 0) return null;
   return (
     <div>
-      <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-faint">{label}</h3>
+      <h3 className="mb-1.5 font-semibold text-ink">{label}</h3>
       <ul className="flex list-disc flex-col gap-1 pl-4 marker:text-faint">
         {items.map((it, i) => (
           <li key={i}>{it}</li>
@@ -415,13 +425,13 @@ function LinkGroup({ label, links, showReason }: { label: string; links: LinkedN
   const unique = [...new Map(links.map((l) => [l.id, l])).values()];
   return (
     <section>
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wider text-faint">{label}</h2>
-      <ul className="flex flex-col gap-1.5">
+      <h2 className="mb-2 text-xl font-bold tracking-tight">{label}</h2>
+      <ul className="flex flex-col">
         {unique.map((l) => (
           <li key={l.id}>
-            <Link href={`/notes/${l.id}`} className="block rounded-lg border border-line bg-panel px-3 py-2 text-sm transition hover:border-accent/60">
-              <span className="text-ink">{l.title}</span>
-              {showReason && l.reason && <span className="mt-0.5 block text-xs text-faint">{l.reason}</span>}
+            <Link href={`/notes/${l.id}`} className="-mx-2 block rounded-xl px-2 py-1.5 transition hover:bg-panel">
+              <span className="font-medium text-ink">{l.title}</span>
+              {showReason && l.reason && <span className="block text-sm text-faint">{l.reason}</span>}
             </Link>
           </li>
         ))}

@@ -137,7 +137,7 @@ export function Transcript({
               {p.ts && (
                 <button
                   onClick={() => playAt(p.seconds)}
-                  className="mr-2 rounded bg-surface px-1.5 py-0.5 font-mono text-xs text-accent hover:bg-accent/15"
+                  className="mr-2 rounded bg-surface px-1.5 py-0.5 text-xs tabular-nums text-link hover:bg-accent/15"
                   title="Ouvir deste ponto"
                 >
                   {p.ts}

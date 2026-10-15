@@ -13,7 +13,7 @@ interface AnalysisResult {
   decisions: string[];
   people: string[];
   questions: string[];
-  topics: { name: string; description: string; relevance: number }[];
+  topics: { name: string; description: string; relevance: number; emoji?: string }[];
   related_notes: { id: string; reason: string }[];
 }
 
@@ -57,6 +57,7 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
           properties: {
             name: { type: "string", description: "Nome do tema, curto (1 a 4 palavras)." },
             description: { type: "string", description: "Uma frase explicando o tema (usada só se for novo)." },
+            emoji: { type: "string", description: "Um único emoji que represente o tema (usado só se for novo)." },
             relevance: { type: "number", description: "0 a 1: quanto a nota trata desse tema." },
           },
           required: ["name", "description", "relevance"],
@@ -177,7 +178,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
         const { data: created } = await supabase
           .from("topics")
           .upsert(
-            missing.map((t) => ({ name: t.name, slug: t.slug, description: t.description })),
+            missing.map((t) => ({ name: t.name, slug: t.slug, description: t.description, emoji: t.emoji?.trim().slice(0, 8) || null })),
             { onConflict: "user_id,slug" },
           )
           .select("id, slug");

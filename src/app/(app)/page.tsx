@@ -1,13 +1,12 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { QuickCapture } from "@/components/QuickCapture";
-import { NoteCard } from "@/components/NoteCard";
+import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";
+import { TopicChip } from "@/components/TopicChip";
 import { Icon } from "@/components/Icon";
 import type { Insights, NoteListItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-const LIST_COLUMNS = "id, title, kind, status, summary, updated_at, duration_seconds, pinned";
 
 export default async function HomePage() {
   const supabase = await supabaseServer();
@@ -15,7 +14,7 @@ export default async function HomePage() {
   const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }] = await Promise.all([
     supabase.from("notes").select(LIST_COLUMNS).eq("pinned", true).order("updated_at", { ascending: false }).limit(6),
     supabase.from("notes").select(LIST_COLUMNS).order("updated_at", { ascending: false }).limit(9),
-    supabase.from("topics").select("id, name, slug, note_topics(count)").limit(200),
+    supabase.from("topics").select("id, name, slug, color, emoji, note_topics(count)").limit(200),
     supabase
       .from("notes")
       .select("id, title, insights, created_at")
@@ -44,15 +43,15 @@ export default async function HomePage() {
   const greeting = h < 12 ? "Bom dia" : h < 18 ? "Boa tarde" : "Boa noite";
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto flex max-w-5xl flex-col gap-10">
+      <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{greeting}.</h1>
-          <p className="text-sm text-muted">O que vale guardar hoje?</p>
+          <h1 className="display text-6xl md:text-8xl">{greeting}.</h1>
+          <p className="mt-3 text-lg text-muted">O que vale guardar hoje?</p>
         </div>
         <Link
           href="/record"
-          className="hidden items-center gap-2 rounded-full bg-rec px-4 py-2 text-sm font-medium text-white shadow-md shadow-rec/25 transition hover:brightness-110 md:inline-flex"
+          className="hidden items-center gap-2 rounded-full bg-rec px-5 py-2.5 font-semibold text-white transition hover:brightness-110 md:inline-flex"
         >
           <Icon name="mic" className="h-4 w-4" />
           Gravar conversa
@@ -64,7 +63,7 @@ export default async function HomePage() {
       {(pinned ?? []).length > 0 && (
         <section>
           <SectionTitle>Fixadas</SectionTitle>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-x-8 sm:grid-cols-2">
             {(pinned as NoteListItem[]).map((n) => (
               <NoteCard key={n.id} note={n} />
             ))}
@@ -72,18 +71,18 @@ export default async function HomePage() {
         </section>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_300px]">
+      <div className="grid gap-12 lg:grid-cols-[1fr_280px]">
         <section>
-          <div className="flex items-center justify-between">
+          <div className="flex items-baseline justify-between">
             <SectionTitle>Recentes</SectionTitle>
-            <Link href="/notes" className="mb-3 text-xs text-muted hover:text-accent">
-              ver todas →
+            <Link href="/notes" className="text-muted underline-offset-4 hover:text-ink hover:underline">
+              Ver todas as notas
             </Link>
           </div>
           {(recent ?? []).length === 0 ? (
             <EmptyState />
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex flex-col">
               {(recent as NoteListItem[]).map((n) => (
                 <NoteCard key={n.id} note={n} />
               ))}
@@ -95,15 +94,9 @@ export default async function HomePage() {
           {topTopics.length > 0 && (
             <section>
               <SectionTitle>Temas</SectionTitle>
-              <div className="flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-2">
                 {topTopics.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={`/topics/${t.slug}`}
-                    className="rounded-full border border-topic/30 bg-topic/10 px-2.5 py-1 text-xs text-topic transition hover:border-topic"
-                  >
-                    {t.name} <span className="opacity-60">{t.count}</span>
-                  </Link>
+                  <TopicChip key={t.id} topic={t} count={t.count} />
                 ))}
               </div>
             </section>
@@ -111,18 +104,21 @@ export default async function HomePage() {
 
           {actions.length > 0 && (
             <section>
-              <SectionTitle>Próximos passos extraídos</SectionTitle>
-              <ul className="flex flex-col gap-2">
+              <SectionTitle>Próximos passos</SectionTitle>
+              <ul className="flex flex-col gap-4">
                 {actions.map((a, i) => (
-                  <li key={i} className="rounded-lg border border-line bg-panel p-3 text-sm">
-                    <p className="text-ink">{a.text}</p>
-                    <p className="mt-1 text-xs text-faint">
-                      {[a.owner, a.due].filter(Boolean).join(" · ")}
-                      {(a.owner || a.due) && " · "}
-                      <Link href={`/notes/${a.noteId}`} className="hover:text-accent">
-                        {a.noteTitle}
-                      </Link>
-                    </p>
+                  <li key={i} className="flex gap-3">
+                    <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full border-2 border-accent" aria-hidden />
+                    <div>
+                      <p className="leading-snug text-ink">{a.text}</p>
+                      <p className="mt-0.5 text-sm text-faint">
+                        {a.owner && <span className="mr-2">{a.owner}</span>}
+                        {a.due && <span className="mr-2">até {a.due}</span>}
+                        <Link href={`/notes/${a.noteId}`} className="underline-offset-2 hover:text-ink hover:underline">
+                          de “{a.noteTitle}”
+                        </Link>
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -135,16 +131,14 @@ export default async function HomePage() {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-faint">{children}</h2>;
+  return <h2 className="mb-3 text-2xl font-bold tracking-tight">{children}</h2>;
 }
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-dashed border-line p-8 text-center text-sm text-muted">
-      <p className="mb-1 font-medium text-ink">Sua teia está vazia.</p>
-      <p>
-        Grave uma conversa ou escreva uma nota acima. O Claude resume, separa os temas e liga tudo automaticamente.
-      </p>
+    <div className="py-6 text-muted">
+      <p className="mb-1 text-lg font-semibold text-ink">Nenhuma nota ainda.</p>
+      <p>Escreva uma ideia aqui em cima ou grave uma conversa. O Claude resume, separa os temas e liga tudo sozinho.</p>
     </div>
   );
 }

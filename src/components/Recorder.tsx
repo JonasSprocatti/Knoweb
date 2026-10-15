@@ -398,8 +398,8 @@ export function Recorder({ userId }: { userId: string }) {
         className="w-full border-0 border-b border-line bg-transparent pb-2 text-xl font-semibold text-ink placeholder:text-faint focus:border-accent focus:outline-none"
       />
 
-      <section className="flex flex-col items-center gap-5 rounded-2xl border border-line bg-panel px-6 py-10">
-        <div className="font-mono text-5xl tabular-nums tracking-tight text-ink">{formatDuration(elapsed)}</div>
+      <section className="flex flex-col items-center gap-5 rounded-[2rem] bg-panel px-6 py-10">
+        <div className="text-7xl font-extrabold tabular-nums tracking-tight text-ink [font-stretch:78%]">{formatDuration(elapsed)}</div>
 
         <div className="flex h-8 items-end gap-1" aria-hidden>
           {Array.from({ length: 24 }).map((_, i) => {
@@ -485,7 +485,7 @@ export function Recorder({ userId }: { userId: string }) {
 
       {(active || phase === "stopping") && (
         <section className="flex flex-col gap-2">
-          <label className="text-xs font-medium uppercase tracking-wider text-faint">Anotações durante a gravação</label>
+          <label className="text-xl font-bold tracking-tight">Suas anotações</label>
           <textarea
             value={liveNotes}
             onChange={(e) => {
@@ -501,7 +501,7 @@ export function Recorder({ userId }: { userId: string }) {
 
       {local.length > 0 && (
         <section className="flex flex-col gap-2">
-          <h2 className="text-xs font-medium uppercase tracking-wider text-faint">Transcrição ao vivo</h2>
+          <h2 className="text-xl font-bold tracking-tight">Transcrição ao vivo</h2>
           <ol className="flex flex-col gap-2">
             {local.map((s) => {
               const r = remote[s.seq];
