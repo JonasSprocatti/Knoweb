@@ -119,6 +119,7 @@ O app não usa a `service_role` do Supabase: todas as rotas agem como o usuário
 
 ## Próximos passos possíveis
 
+- Usar o Gemini (plano gratuito) no lugar de Claude + Whisper. O código já existe (`src/lib/server/gemini.ts`), só está desligado: cadastre `GEMINI_API_KEY` e o seletor Claude/Gemini aparece no app.
 - Busca semântica com `pgvector` (embeddings) para o "Perguntar" achar notas por significado.
 - Separação de falantes com um serviço de diarização (Deepgram, AssemblyAI).
 - Sincronização com um vault do Obsidian (exportar/importar a base inteira como pasta de `.md`).

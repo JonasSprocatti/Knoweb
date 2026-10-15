@@ -2,8 +2,12 @@ import { cookies } from "next/headers";
 
 export type Provider = "claude" | "gemini";
 
-/** Provedor escolhido no seletor do app (cookie "ai"); sem escolha, usa AI_PROVIDER ou a chave que existir. */
+/**
+ * Provedor escolhido no seletor do app (cookie "ai"); sem escolha, usa AI_PROVIDER ou a chave que existir.
+ * Sem GEMINI_API_KEY o Gemini fica desligado: o seletor some e vale sempre o Claude.
+ */
 export async function aiProvider(): Promise<Provider> {
+  if (!process.env.GEMINI_API_KEY) return "claude";
   const chosen = (await cookies()).get("ai")?.value;
   if (chosen === "claude" || chosen === "gemini") return chosen;
   if (process.env.AI_PROVIDER === "claude" || process.env.AI_PROVIDER === "gemini") return process.env.AI_PROVIDER;

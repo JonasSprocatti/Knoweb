@@ -10,5 +10,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  return <Shell email={user.email ?? ""} ai={await aiProvider()}>{children}</Shell>;
+  return <Shell email={user.email ?? ""} ai={process.env.GEMINI_API_KEY ? await aiProvider() : null}>{children}</Shell>;
 }

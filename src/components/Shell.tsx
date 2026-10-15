@@ -41,7 +41,7 @@ function AiSelect({ ai }: { ai: string }) {
   );
 }
 
-export function Shell({ email, ai, children }: { email: string; ai: string; children: React.ReactNode }) {
+export function Shell({ email, ai, children }: { email: string; ai: string | null; children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -94,7 +94,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string; chil
           <span className="truncate" title={email}>
             {email}
           </span>
-          <AiSelect ai={ai} />
+          {ai && <AiSelect ai={ai} />}
           <form action="/auth/signout" method="post">
             <button className="rounded p-1 hover:text-ink" title="Sair" aria-label="Sair">
               <Icon name="logout" className="h-4 w-4" />
@@ -122,7 +122,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string; chil
               />
             </label>
           </form>
-          <AiSelect ai={ai} />
+          {ai && <AiSelect ai={ai} />}
           <NewNoteButton label="" className="px-2.5" />
         </header>
 
