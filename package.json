@@ -2,7 +2,7 @@
   "name": "teia",
   "version": "0.1.0",
   "private": true,
-  "description": "Teia — notas, gravações e transcrições conectadas numa teia de conhecimento, com análise pelo Claude.",
+  "description": "Knoweb — notas, gravações e transcrições conectadas numa teia de conhecimento, com análise pelo Claude.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

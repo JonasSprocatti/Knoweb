@@ -7,11 +7,11 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono-jb" });
 
 export const metadata: Metadata = {
-  title: { default: "Teia", template: "%s · Teia" },
+  title: { default: "Knoweb", template: "%s · Knoweb" },
   description: "Notas, gravações e transcrições conectadas numa teia de conhecimento.",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icon.svg", apple: "/icon.svg" },
-  appleWebApp: { capable: true, title: "Teia", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Knoweb", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

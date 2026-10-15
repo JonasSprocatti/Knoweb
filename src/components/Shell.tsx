@@ -38,7 +38,7 @@ export function Shell({ email, children }: { email: string; children: React.Reac
         <Link href="/" className="mb-5 flex items-center gap-2 px-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="" className="h-7 w-7" />
-          <span className="text-lg font-bold tracking-tight">Teia</span>
+          <span className="text-lg font-bold tracking-tight">Knoweb</span>
         </Link>
 
         <form onSubmit={search} className="mb-3">
@@ -88,7 +88,7 @@ export function Shell({ email, children }: { email: string; children: React.Reac
         <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line bg-bg/90 px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
           <Link href="/" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="Teia" className="h-7 w-7" />
+            <img src="/icon.svg" alt="Knoweb" className="h-7 w-7" />
           </Link>
           <form onSubmit={search} className="flex-1">
             <label className="flex items-center gap-2 rounded-lg border border-line bg-panel px-2.5 py-1.5 text-sm">

@@ -55,7 +55,7 @@ export default function LoginPage() {
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icon.svg" alt="" className="h-14 w-14" />
-          <h1 className="text-2xl font-bold tracking-tight">Teia</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Knoweb</h1>
           <p className="text-sm text-muted">Grave, escreva e deixe o Claude ligar os pontos.</p>
         </div>
 

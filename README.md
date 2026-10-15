@@ -1,4 +1,4 @@
-# Teia
+# Knoweb
 
 Um meio-termo entre Notion e Obsidian: você grava conversas (no PC ou no celular), escreve notas em markdown, e o Claude resume, separa os temas e liga tudo numa teia de conhecimento que você navega por grafo, por tema ou perguntando.
 

@@ -1,5 +1,5 @@
 -- =====================================================================
--- Teia — schema do banco (rode inteiro no SQL Editor do Supabase)
+-- Knoweb — schema do banco (rode inteiro no SQL Editor do Supabase)
 -- =====================================================================
 
 create extension if not exists "pgcrypto";
