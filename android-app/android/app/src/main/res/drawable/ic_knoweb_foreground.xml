@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Mesmo desenho de public/icon.svg (viewBox 512), encolhido para a área segura do ícone adaptativo -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="15.6" android:translateY="13" android:scaleX="0.15" android:scaleY="0.15">
+        <path android:strokeColor="#e0a64f" android:strokeWidth="14" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M256,120 L150,330 L362,330 Z M256,120 L256,250 M150,330 L256,250 M362,330 L256,250 M150,330 L110,400 M362,330 L402,400 M256,120 L256,80" />
+        <path android:fillColor="#ece6dc"
+            android:pathData="M230,120 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 M124,330 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0 M336,330 a26,26 0 1,0 52,0 a26,26 0 1,0 -52,0" />
+        <path android:fillColor="#6cc3b5"
+            android:pathData="M222,250 a34,34 0 1,0 68,0 a34,34 0 1,0 -68,0" />
+    </group>
+</vector>

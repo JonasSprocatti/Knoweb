@@ -1,0 +1,8 @@
+{
+  "appId": "com.jonassprocatti.knoweb",
+  "appName": "Knoweb",
+  "webDir": "www",
+  "server": {
+    "url": "https://knoweb-jasssprotti-2627s-projects.vercel.app"
+  }
+}

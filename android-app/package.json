@@ -1,0 +1,12 @@
+{
+  "name": "knoweb-android",
+  "private": true,
+  "description": "App Android do Knoweb: abre o site da Vercel e mantém a gravação viva em segundo plano.",
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3"
+  }
+}

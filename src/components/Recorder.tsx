@@ -24,6 +24,13 @@ interface LocalSegment {
   segmentId?: string;
 }
 
+/** No app Android (Capacitor) liga o serviço que mantém o microfone vivo em segundo plano. */
+function nativeRecording(method: "start" | "stop") {
+  const cap = (window as { Capacitor?: { nativePromise?: (p: string, m: string, o: object) => Promise<unknown> } }).Capacitor;
+  return cap?.nativePromise?.("RecordingService", method, {}).catch(() => undefined);
+}
+const isNativeApp = () => typeof window !== "undefined" && "Capacitor" in window;
+
 export function Recorder({ userId }: { userId: string }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("idle");
@@ -246,6 +253,14 @@ export function Recorder({ userId }: { userId: string }) {
         };
       }
       streamRef.current = stream;
+      if (isNativeApp()) {
+        await nativeRecording("start");
+        const stopMic = cleanupRef.current;
+        cleanupRef.current = () => {
+          stopMic?.();
+          nativeRecording("stop");
+        };
+      }
       mimeRef.current = pickMimeType();
 
       const initialTitle = title.trim() || defaultRecordingTitle();
@@ -451,7 +466,9 @@ export function Recorder({ userId }: { userId: string }) {
           {phase === "recording" &&
             (canCaptureSystem
               ? "Gravando. Pode minimizar e trabalhar em outras janelas, só não feche o Knoweb."
-              : "Gravando. No celular, mantenha esta tela aberta.")}
+              : isNativeApp()
+                ? "Gravando. Pode apagar a tela ou usar outros apps."
+                : "Gravando. No celular, mantenha esta tela aberta (ou use o app Android para gravar em segundo plano).")}
           {phase === "paused" && "Pausado."}
         </p>
         {canCaptureSystem && (phase === "idle" || phase === "error") && (
