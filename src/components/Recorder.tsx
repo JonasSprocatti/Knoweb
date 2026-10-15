@@ -49,6 +49,14 @@ export function Recorder({ userId }: { userId: string }) {
   const rafRef = useRef<number | null>(null);
   const noteIdRef = useRef<string | null>(null);
   const failedRef = useRef<Set<number>>(new Set());
+  const [meeting, setMeeting] = useState(false);
+  const [canCaptureSystem, setCanCaptureSystem] = useState(false);
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  // Som do sistema só existe no navegador do computador (Chrome/Edge)
+  useEffect(() => {
+    setCanCaptureSystem(!!navigator.mediaDevices?.getDisplayMedia && !/Android|iPhone|iPad/i.test(navigator.userAgent));
+  }, []);
 
   const activeMs = () =>
     accumulatedMsRef.current + (resumedAtRef.current != null ? performance.now() - resumedAtRef.current : 0);
@@ -209,9 +217,34 @@ export function Recorder({ userId }: { userId: string }) {
     }
     setPhase("starting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const mic = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
+      let stream = mic;
+      cleanupRef.current = () => mic.getTracks().forEach((t) => t.stop());
+      if (meeting) {
+        // Reunião: mistura o som do PC (Teams, Zoom...) com o microfone
+        const screen = await navigator.mediaDevices
+          .getDisplayMedia({ video: true, audio: true, systemAudio: "include" } as DisplayMediaStreamOptions)
+          .catch((err) => {
+            mic.getTracks().forEach((t) => t.stop());
+            throw err;
+          });
+        if (screen.getAudioTracks().length === 0) {
+          screen.getTracks().forEach((t) => t.stop());
+          mic.getTracks().forEach((t) => t.stop());
+          throw new Error('O som do computador não veio. Escolha "Tela inteira" e marque "Compartilhar também o áudio do sistema".');
+        }
+        const ctx = new AudioContext();
+        const out = ctx.createMediaStreamDestination();
+        ctx.createMediaStreamSource(mic).connect(out);
+        ctx.createMediaStreamSource(new MediaStream(screen.getAudioTracks())).connect(out);
+        stream = out.stream;
+        cleanupRef.current = () => {
+          [...mic.getTracks(), ...screen.getTracks()].forEach((t) => t.stop());
+          ctx.close().catch(() => undefined);
+        };
+      }
       streamRef.current = stream;
       mimeRef.current = pickMimeType();
 
@@ -230,10 +263,12 @@ export function Recorder({ userId }: { userId: string }) {
       startSegment();
       setPhase("recording");
     } catch (err) {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
+      cleanupRef.current?.();
       const message =
         err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Permissão do microfone negada. Libere o microfone para este site nas configurações do navegador."
+          ? meeting
+            ? "Permissão negada. Libere o microfone e escolha a tela para compartilhar o som."
+            : "Permissão do microfone negada. Libere o microfone para este site nas configurações do navegador."
           : err instanceof Error
             ? err.message
             : String(err);
@@ -279,6 +314,7 @@ export function Recorder({ userId }: { userId: string }) {
     accumulatedMsRef.current = activeMs();
     resumedAtRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    cleanupRef.current?.();
     stopMeter();
     wakeLockRef.current?.release().catch(() => undefined);
 
@@ -411,10 +447,22 @@ export function Recorder({ userId }: { userId: string }) {
 
         <p className="text-center text-sm text-muted">
           {phase === "idle" && "Toque para gravar. O áudio é enviado em pedaços e transcrito enquanto você fala."}
-          {phase === "starting" && "Pedindo acesso ao microfone…"}
-          {phase === "recording" && "Gravando. No celular, mantenha esta tela aberta."}
+          {phase === "starting" && (meeting ? 'Escolha "Tela inteira" e marque "Compartilhar também o áudio do sistema".' : "Pedindo acesso ao microfone…")}
+          {phase === "recording" &&
+            (canCaptureSystem
+              ? "Gravando. Pode minimizar e trabalhar em outras janelas, só não feche o Knoweb."
+              : "Gravando. No celular, mantenha esta tela aberta.")}
           {phase === "paused" && "Pausado."}
         </p>
+        {canCaptureSystem && (phase === "idle" || phase === "error") && (
+          <label className="flex max-w-md cursor-pointer items-start gap-2 text-sm text-muted">
+            <input type="checkbox" checked={meeting} onChange={(e) => setMeeting(e.target.checked)} className="mt-1 accent-accent" />
+            <span>
+              <span className="font-medium text-ink">Reunião no computador</span> (Teams, Zoom, Meet…): grava o som do PC junto com o
+              seu microfone. Use fone de ouvido para não duplicar as vozes.
+            </span>
+          </label>
+        )}
         {error && <p className="rounded-lg bg-rec/10 px-4 py-2 text-center text-sm text-rec">{error}</p>}
       </section>
 
