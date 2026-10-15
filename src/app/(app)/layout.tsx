@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Shell } from "@/components/Shell";
+import { aiProvider } from "@/lib/server/gemini";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await supabaseServer();
@@ -9,5 +10,5 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  return <Shell email={user.email ?? ""}>{children}</Shell>;
+  return <Shell email={user.email ?? ""} ai={await aiProvider()}>{children}</Shell>;
 }

@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/supabase/server";
 import { anthropic, clip, CLAUDE_MODEL } from "@/lib/server/claude";
+import { aiProvider, geminiStream } from "@/lib/server/gemini";
 import { badRequest, unauthorized } from "@/lib/server/http";
 
 export const maxDuration = 300;
@@ -73,10 +74,19 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
     },
   ];
 
+  const provider = await aiProvider();
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        if (provider === "gemini") {
+          const turns = messages.map((m) => ({
+            role: m.role === "assistant" ? ("model" as const) : ("user" as const),
+            parts: [{ text: m.content }],
+          }));
+          for await (const text of geminiStream(SYSTEM, turns)) controller.enqueue(encoder.encode(text));
+          return;
+        }
         const response = anthropic().messages.stream({
           model: CLAUDE_MODEL,
           max_tokens: 2048,

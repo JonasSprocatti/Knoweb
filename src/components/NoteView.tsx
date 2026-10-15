@@ -305,7 +305,7 @@ export function NoteView({
               disabled={busy || processing}
               className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-ink disabled:opacity-50"
             >
-              {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar com Claude"}
+              {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar"}
             </button>
           </div>
 

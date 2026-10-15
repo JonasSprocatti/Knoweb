@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropic, clip, CLAUDE_MODEL } from "@/lib/server/claude";
+import { aiProvider, gemini } from "@/lib/server/gemini";
 import { slugify } from "@/lib/text";
 import type { Insights } from "@/lib/types";
 
@@ -138,18 +139,26 @@ ${clip(body, 400_000)}
 
 Analise a nota e chame a ferramenta salvar_analise.`;
 
-    const response = await anthropic().messages.create({
-      model: CLAUDE_MODEL,
-      max_tokens: 4096,
-      system: SYSTEM,
-      tools: [ANALYSIS_TOOL],
-      tool_choice: { type: "tool", name: ANALYSIS_TOOL.name },
-      messages: [{ role: "user", content: userPrompt }],
-    });
-
-    const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-    if (!toolUse) throw new Error("O Claude não devolveu a análise.");
-    const result = toolUse.input as AnalysisResult;
+    let result: AnalysisResult;
+    if ((await aiProvider()) === "gemini") {
+      result = await gemini<AnalysisResult>(
+        SYSTEM,
+        [{ role: "user", parts: [{ text: userPrompt.replace("chame a ferramenta salvar_analise", "devolva a análise") }] }],
+        ANALYSIS_TOOL.input_schema,
+      );
+    } else {
+      const response = await anthropic().messages.create({
+        model: CLAUDE_MODEL,
+        max_tokens: 4096,
+        system: SYSTEM,
+        tools: [ANALYSIS_TOOL],
+        tool_choice: { type: "tool", name: ANALYSIS_TOOL.name },
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+      if (!toolUse) throw new Error("O Claude não devolveu a análise.");
+      result = toolUse.input as AnalysisResult;
+    }
 
     // ---- Temas -------------------------------------------------------
     const wanted = (result.topics ?? [])

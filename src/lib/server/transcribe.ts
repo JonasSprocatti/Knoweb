@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { analyzeNote } from "@/lib/server/analyze";
+import { aiProvider, gemini } from "@/lib/server/gemini";
 import { formatTimestamp } from "@/lib/text";
 
 const MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
@@ -35,7 +36,22 @@ function extFor(mime: string, path: string) {
 
 type WhisperSegment = { start: number; end: number; text: string };
 
-/** Baixa um pedaço de áudio do Storage, manda para o Whisper e salva o texto. */
+const GEMINI_SCHEMA = {
+  type: "object",
+  properties: {
+    segments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { start: { type: "number" }, end: { type: "number" }, text: { type: "string" } },
+        required: ["start", "end", "text"],
+      },
+    },
+  },
+  required: ["segments"],
+};
+
+/** Baixa um pedaço de áudio do Storage, manda para o Whisper ou o Gemini e salva o texto. */
 export async function transcribeSegment(supabase: SupabaseClient, segmentId: string) {
   const { data: seg, error } = await supabase
     .from("audio_segments")
@@ -51,26 +67,38 @@ export async function transcribeSegment(supabase: SupabaseClient, segmentId: str
     const { data: blob, error: dlError } = await supabase.storage.from("audio").download(seg.storage_path);
     if (dlError || !blob) throw new Error(`Falha ao baixar o áudio: ${dlError?.message ?? "vazio"}`);
 
-    const file = await toFile(blob, `segmento-${seg.seq}.${extFor(seg.mime_type, seg.storage_path)}`, {
-      type: seg.mime_type.split(";")[0],
-    });
-
     let text = "";
     let segments: WhisperSegment[] = [];
 
-    if (MODEL === "whisper-1") {
-      const result = await openai().audio.transcriptions.create({
-        file,
-        model: MODEL,
-        language: LANGUAGE,
-        response_format: "verbose_json",
-        timestamp_granularities: ["segment"],
-      });
-      text = result.text ?? "";
-      segments = (result.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: s.text.trim() }));
+    if ((await aiProvider()) === "gemini") {
+      // ponytail: áudio vai inline (limite ~20 MB por pedido); arquivos enviados maiores pedem a Files API do Gemini
+      const audio = Buffer.from(await blob.arrayBuffer()).toString("base64");
+      const result = await gemini<{ segments: WhisperSegment[] }>(
+        `Transcreva o áudio literalmente, no idioma "${LANGUAGE}". Não resuma nem traduza. Divida em trechos de uma ou poucas frases, com início e fim em segundos desde o começo do áudio.`,
+        [{ role: "user", parts: [{ inline_data: { mime_type: seg.mime_type.split(";")[0], data: audio } }] }],
+        GEMINI_SCHEMA,
+      );
+      segments = (result.segments ?? []).map((s) => ({ start: Number(s.start) || 0, end: Number(s.end) || 0, text: s.text.trim() }));
+      text = segments.map((s) => s.text).join(" ");
     } else {
-      const result = await openai().audio.transcriptions.create({ file, model: MODEL, language: LANGUAGE });
-      text = result.text ?? "";
+      const file = await toFile(blob, `segmento-${seg.seq}.${extFor(seg.mime_type, seg.storage_path)}`, {
+        type: seg.mime_type.split(";")[0],
+      });
+
+      if (MODEL === "whisper-1") {
+        const result = await openai().audio.transcriptions.create({
+          file,
+          model: MODEL,
+          language: LANGUAGE,
+          response_format: "verbose_json",
+          timestamp_granularities: ["segment"],
+        });
+        text = result.text ?? "";
+        segments = (result.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: s.text.trim() }));
+      } else {
+        const result = await openai().audio.transcriptions.create({ file, model: MODEL, language: LANGUAGE });
+        text = result.text ?? "";
+      }
     }
 
     await supabase

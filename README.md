@@ -95,6 +95,9 @@ As rotas de transcrição e análise pedem até 300 s de execução (`maxDuratio
 | `OPENAI_API_KEY` | Chave da OpenAI para o Whisper |
 | `OPENAI_TRANSCRIBE_MODEL` | Padrão `whisper-1` (o único que devolve marcas de tempo por trecho) |
 | `TRANSCRIBE_LANGUAGE` | Idioma das gravações, padrão `pt` |
+| `GEMINI_API_KEY` | Chave do Gemini ([aistudio.google.com](https://aistudio.google.com), tem plano gratuito). Com o seletor em "Gemini", ele transcreve, analisa e responde no lugar de Claude + Whisper |
+| `GEMINI_MODEL` | Padrão `gemini-2.5-flash` |
+| `AI_PROVIDER` | `claude` ou `gemini`: o padrão enquanto o seletor do app não foi usado |
 
 O app não usa a `service_role` do Supabase: todas as rotas agem como o usuário logado, e o Postgres garante o isolamento pelas regras de RLS.
 

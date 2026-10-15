@@ -21,7 +21,27 @@ function isActive(path: string, href: string) {
   return href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 }
 
-export function Shell({ email, children }: { email: string; children: React.ReactNode }) {
+/** Escolhe quem transcreve, analisa e responde: Claude + Whisper ou Gemini. Fica num cookie lido pelo servidor. */
+function AiSelect({ ai }: { ai: string }) {
+  const router = useRouter();
+  return (
+    <select
+      value={ai}
+      onChange={(e) => {
+        document.cookie = `ai=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
+        router.refresh();
+      }}
+      title="IA usada para transcrever, analisar e responder"
+      aria-label="IA"
+      className="rounded-lg border border-line bg-panel px-1.5 py-1 text-xs text-muted focus:border-accent focus:outline-none"
+    >
+      <option value="claude">Claude</option>
+      <option value="gemini">Gemini</option>
+    </select>
+  );
+}
+
+export function Shell({ email, ai, children }: { email: string; ai: string; children: React.ReactNode }) {
   const path = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -74,6 +94,7 @@ export function Shell({ email, children }: { email: string; children: React.Reac
           <span className="truncate" title={email}>
             {email}
           </span>
+          <AiSelect ai={ai} />
           <form action="/auth/signout" method="post">
             <button className="rounded p-1 hover:text-ink" title="Sair" aria-label="Sair">
               <Icon name="logout" className="h-4 w-4" />
@@ -101,6 +122,7 @@ export function Shell({ email, children }: { email: string; children: React.Reac
               />
             </label>
           </form>
+          <AiSelect ai={ai} />
           <NewNoteButton label="" className="px-2.5" />
         </header>
 
