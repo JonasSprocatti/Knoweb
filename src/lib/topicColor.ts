@@ -1,5 +1,5 @@
 /** Uma cor por tema: a do banco, se houver; senão uma da paleta escolhida pelo nome (sempre a mesma). */
-export const TOPIC_PALETTE = ["#FF8A5B", "#FFD23F", "#5EE6C3", "#7FB2FF", "#C38CFF", "#FF6FB5", "#9BE15D", "#4FD1FF"];
+export const TOPIC_PALETTE = ["#3D6FD9", "#2F9E8F", "#C27A3A", "#7A5BD0", "#C2456E", "#5C8A3A", "#2E8FB5", "#9A7B3F"];
 
 export function topicColor(t: { slug: string; color?: string | null }): string {
   if (t.color) return t.color;

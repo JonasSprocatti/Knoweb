@@ -3,7 +3,7 @@ import type { GraphLink, GraphNode } from "@/lib/types";
 export type SimNode = GraphNode & { x?: number; y?: number };
 export type SimLink = Omit<GraphLink, "source" | "target"> & { source: string | SimNode; target: string | SimNode };
 
-export type ThemeId = "espaco" | "teia" | "abissal" | "constelacao";
+export type ThemeId = "executivo" | "espaco" | "teia" | "abissal" | "constelacao";
 
 export interface NodeState {
   r: number;
@@ -262,5 +262,39 @@ const constelacao: GraphTheme = {
   },
 };
 
-export const THEMES: Record<ThemeId, GraphTheme> = { espaco, teia, abissal, constelacao };
-export const THEME_LIST = [espaco, teia, abissal, constelacao];
+/** Executivo: plano e sóbrio, segue o modo claro/escuro do app. */
+function executivo(dark: boolean): GraphTheme {
+  const bg = dark ? "#15181F" : "#F6F7F9";
+  const ring = dark ? "#15181F" : "#FFFFFF";
+  return {
+    id: "executivo",
+    name: "Executivo",
+    bg,
+    label: dark ? "#E7E9EE" : "#161A23",
+    animated: false,
+    curvature: 0,
+    linkColor: (l, lit) => (lit ? (dark ? (l.kind === "topic" ? "#3A4150" : "#5A6378") : l.kind === "topic" ? "#D3D8E0" : "#9AA3B2") : dark ? "#262B35" : "#ECEEF2"),
+    linkWidth: (l) => (l.kind === "wikilink" ? 1.4 : 0.8),
+    particles: () => 0,
+    particleColor: () => "#7C9CFF",
+    backdrop: () => {},
+    node: (ctx, n, { r, lit, scale }) => {
+      ctx.globalAlpha = lit ? 1 : 0.25;
+      circle(ctx, n.x ?? 0, n.y ?? 0, r);
+      ctx.fillStyle = n.type === "recording" ? ring : n.color;
+      ctx.fill();
+      ctx.lineWidth = n.type === "recording" ? r * 0.4 : 1.5 / scale;
+      ctx.strokeStyle = n.type === "recording" ? n.color : ring;
+      ctx.stroke();
+    },
+  };
+}
+
+const PLAYFUL: Record<Exclude<ThemeId, "executivo">, GraphTheme> = { espaco, teia, abissal, constelacao };
+export const THEME_LIST: { id: ThemeId; name: string }[] = [
+  { id: "executivo", name: "Executivo" },
+  ...[espaco, teia, abissal, constelacao].map((t) => ({ id: t.id, name: t.name })),
+];
+export function themeFor(id: ThemeId, dark: boolean): GraphTheme {
+  return id === "executivo" ? executivo(dark) : (PLAYFUL[id] ?? executivo(dark));
+}

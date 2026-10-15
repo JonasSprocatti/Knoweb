@@ -28,7 +28,7 @@ export function QuickCapture() {
   }
 
   return (
-    <div className="rounded-3xl bg-panel p-4 focus-within:ring-2 focus-within:ring-accent">
+    <div className="rounded-lg border border-line bg-panel p-3 focus-within:border-accent">
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -37,7 +37,7 @@ export function QuickCapture() {
         }}
         rows={3}
         placeholder="Anote uma ideia, um insight, algo que alguém disse… Use [[Outra nota]] para ligar."
-        className="w-full resize-none bg-transparent p-1 text-lg text-ink placeholder:text-faint focus:outline-none"
+        className="w-full resize-none bg-transparent p-1 text-ink placeholder:text-faint focus:outline-none"
       />
       <div className="flex items-center justify-between gap-3 pt-1">
         <label className="flex cursor-pointer items-center gap-2 text-sm text-muted">
@@ -47,7 +47,7 @@ export function QuickCapture() {
         <button
           onClick={save}
           disabled={busy || !text.trim()}
-          className="rounded-full bg-accent px-4 py-1.5 font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-40"
+          className="rounded-md bg-accent px-3.5 py-1.5 text-sm font-medium text-on-accent transition hover:brightness-110 disabled:opacity-40"
         >
           {busy ? "Salvando…" : "Salvar nota"}
         </button>

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { THEME_LIST, THEMES, type SimLink, type SimNode, type ThemeId } from "@/lib/graphThemes";
+import { THEME_LIST, themeFor, type SimLink, type SimNode, type ThemeId } from "@/lib/graphThemes";
 import type { GraphLink, GraphNode } from "@/lib/types";
 
 // O canvas do grafo só existe no navegador; o 3D (three.js) só carrega quando é ligado
@@ -45,9 +45,9 @@ export function GraphView() {
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [raw, setRaw] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [themeId, setThemeId] = usePref<ThemeId>("teia:tema", "espaco");
+  const [themeId, setThemeId] = usePref<ThemeId>("teia:visual", "executivo");
   const [threeD, setThreeD] = usePref("teia:3d", false);
-  const [clouds, setClouds] = usePref("teia:nuvens", true);
+  const [clouds, setClouds] = usePref("teia:nuvens", false);
   const [showTopics, setShowTopics] = useState(true);
   const [showAi, setShowAi] = useState(true);
   const [hideOrphans, setHideOrphans] = useState(false);
@@ -61,10 +61,12 @@ export function GraphView() {
   const nodeCache = useRef(new Map<string, SimNode>());
   const images = useRef(new Map<string, HTMLImageElement>());
 
-  const theme = THEMES[themeId] ?? THEMES.espaco;
+  const [dark, setDark] = useState(false);
+  const theme = useMemo(() => themeFor(themeId, dark), [themeId, dark]);
 
   useEffect(() => {
     setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    setDark(window.matchMedia("(prefers-color-scheme: dark)").matches);
     setFont(getComputedStyle(document.body).fontFamily || "sans-serif");
     fetch("/api/graph")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("Não deu para carregar a teia. Recarregue a página."))))
@@ -190,18 +192,18 @@ export function GraphView() {
             onChange={(e) => setFind(e.target.value)}
             placeholder="Achar um ponto"
             aria-label="Achar um ponto na teia"
-            className="w-36 rounded-full border border-line bg-panel px-3 py-1.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none sm:w-48"
+            className="w-36 rounded-md border border-line bg-panel px-3 py-1.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none sm:w-48"
           />
         </form>
 
-        <div role="radiogroup" aria-label="Visual da teia" className="flex shrink-0 gap-1 rounded-full bg-panel p-1">
+        <div role="radiogroup" aria-label="Visual da teia" className="flex shrink-0 gap-0.5 rounded-md border border-line bg-panel p-0.5">
           {THEME_LIST.map((t) => (
             <button
               key={t.id}
               role="radio"
               aria-checked={themeId === t.id}
               onClick={() => setThemeId(t.id)}
-              className={`rounded-full px-3 py-1 transition ${themeId === t.id ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+              className={`rounded px-2.5 py-1 transition ${themeId === t.id ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
             >
               {t.name}
             </button>
@@ -346,14 +348,14 @@ export function GraphView() {
         )}
 
         {times.length > 1 && (
-          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-full bg-black/45 px-3 py-2 text-sm text-white backdrop-blur md:inset-x-auto md:left-6 md:w-[28rem]">
+          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-md border border-line bg-panel/95 px-3 py-2 text-sm text-ink backdrop-blur md:inset-x-auto md:left-6 md:w-[28rem]">
             <button
               onClick={() => {
                 if (playing) return setPlaying(false);
                 setStep(0);
                 setPlaying(true);
               }}
-              className="shrink-0 rounded-full bg-white/15 px-3 py-1 hover:bg-white/25"
+              className="shrink-0 rounded-md bg-surface px-3 py-1 hover:bg-line"
             >
               {playing ? "Parar" : "Ver crescer"}
             </button>
@@ -370,7 +372,7 @@ export function GraphView() {
               aria-label="Linha do tempo da teia"
               className="min-w-0 flex-1 accent-accent"
             />
-            <span className="shrink-0 tabular-nums text-white/80">{step == null ? "hoje" : dayLabel(times[step])}</span>
+            <span className="shrink-0 tabular-nums text-muted">{step == null ? "hoje" : dayLabel(times[step])}</span>
           </div>
         )}
       </div>
@@ -383,7 +385,7 @@ function Toggle({ on, set, label }: { on: boolean; set: (v: boolean) => void; la
     <button
       onClick={() => set(!on)}
       aria-pressed={on}
-      className={`shrink-0 rounded-full border px-3 py-1 transition ${on ? "border-ink/60 text-ink" : "border-line text-faint hover:text-muted"}`}
+      className={`shrink-0 rounded-md border px-3 py-1 transition ${on ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:text-ink"}`}
     >
       {label}
     </button>

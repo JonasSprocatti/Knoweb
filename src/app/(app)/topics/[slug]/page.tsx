@@ -46,11 +46,11 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
         <Link href="/topics" className="text-faint underline-offset-4 hover:text-ink hover:underline">
           Todos os temas
         </Link>
-        <h1 className="display text-6xl md:text-7xl" style={{ color: `color-mix(in srgb, ${topicColor(topic)} 75%, var(--ink))` }}>
-          {topic.emoji && <span className="mr-3 align-middle text-5xl">{topic.emoji}</span>}
+        <h1 className="display text-3xl md:text-4xl" >
+          <span className="mr-3 inline-block h-3 w-3 rounded-full align-middle" style={{ background: topicColor(topic) }} />
           {topic.name}
         </h1>
-        {topic.description && <p className="max-w-2xl text-lg text-muted">{topic.description}</p>}
+        {topic.description && <p className="max-w-2xl text-muted">{topic.description}</p>}
         <CoverPicker table="topics" id={topic.id} initialPath={topic.cover_path} />
       </header>
 
@@ -58,7 +58,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="mr-1 text-faint">Aparece junto com</span>
           {related.map((t) => (
-            <Link key={t.slug} href={`/topics/${t.slug}`} className="rounded-full bg-panel px-3 py-0.5 text-muted hover:text-ink">
+            <Link key={t.slug} href={`/topics/${t.slug}`} className="rounded-md bg-panel px-3 py-0.5 text-muted hover:text-ink">
               {t.name} <span className="text-faint">{t.count}</span>
             </Link>
           ))}
@@ -71,7 +71,7 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
         ))}
       </div>
 
-      <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="self-start rounded-full bg-accent px-4 py-2 font-semibold text-on-accent hover:brightness-110">
+      <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="self-start rounded-md bg-accent px-4 py-2 font-semibold text-on-accent hover:brightness-110">
         Perguntar ao Claude sobre este tema
       </Link>
     </div>

@@ -54,16 +54,15 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
   return (
     <div className="flex min-h-dvh">
       {/* ---------------- Barra lateral (desktop) ---------------- */}
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col px-5 py-7 md:flex">
-        <Link href="/" className="display mb-8 flex items-start gap-1 text-5xl text-ink">
-          knoweb
-          <span className="text-2xl text-accent" aria-hidden>
-            ✦
-          </span>
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-line bg-surface px-4 py-5 md:flex">
+        <Link href="/" className="mb-6 flex items-center gap-2 px-1 text-lg font-semibold text-ink">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" className="h-7 w-7" />
+          Knoweb
         </Link>
 
         <form onSubmit={search} className="mb-3">
-          <label className="flex items-center gap-2 rounded-full bg-panel px-3.5 py-2 focus-within:ring-2 focus-within:ring-accent">
+          <label className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm focus-within:border-accent">
             <Icon name="search" className="h-4 w-4 text-faint" />
             <input
               value={q}
@@ -74,9 +73,9 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
           </label>
         </form>
 
-        <NewNoteButton className="mb-8 justify-center" />
+        <NewNoteButton className="mb-5 justify-center" />
 
-        <nav className="flex flex-col gap-1 text-lg">
+        <nav className="flex flex-col gap-0.5 text-sm">
           {NAV.map((item) => {
             const active = isActive(path, item.href);
             return (
@@ -84,18 +83,18 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-2.5 py-1 transition ${active ? "font-semibold text-ink" : "text-muted hover:text-ink"}`}
+                className={`flex items-center gap-3 rounded-md px-2.5 py-2 transition ${
+                  active ? "bg-panel font-medium text-ink shadow-[inset_2px_0_0_var(--accent)]" : "text-muted hover:bg-panel hover:text-ink"
+                }`}
               >
-                <span className={`w-4 text-center text-sm ${item.href === "/record" ? "text-rec" : "text-accent"}`} aria-hidden>
-                  {active ? "✦" : item.href === "/record" ? "●" : ""}
-                </span>
+                <Icon name={item.icon} className={`h-[18px] w-[18px] ${item.href === "/record" ? "text-rec" : active ? "text-accent" : ""}`} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-sm text-faint">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line px-1 pt-3 text-xs text-faint">
           <span className="truncate" title={email}>
             {email}
           </span>
@@ -111,12 +110,13 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       {/* ---------------- Conteúdo ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topo (celular) */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 bg-bg/90 px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
-          <Link href="/" className="display shrink-0 text-3xl text-ink" aria-label="Knoweb, início">
-            kw<span className="text-accent">✦</span>
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
+          <Link href="/" className="shrink-0" aria-label="Knoweb, início">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icon.svg" alt="" className="h-7 w-7" />
           </Link>
           <form onSubmit={search} className="min-w-0 flex-1">
-            <label className="flex items-center gap-2 rounded-full bg-panel px-3 py-1.5">
+            <label className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm">
               <Icon name="search" className="h-4 w-4 text-faint" />
               <input
                 value={q}
@@ -130,11 +130,11 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
           <NewNoteButton label="" className="px-2.5" />
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-5 md:px-10 md:pb-12 md:pt-10">{children}</main>
+        <main className="flex-1 px-4 pb-28 pt-5 md:px-10 md:pb-12 md:pt-8">{children}</main>
       </div>
 
       {/* ---------------- Navegação inferior (celular) ---------------- */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {MOBILE_NAV.map((href) => {
             const item = NAV.find((n) => n.href === href)!;

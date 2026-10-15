@@ -46,12 +46,12 @@ export default async function HomePage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <h1 className="display text-6xl md:text-8xl">{greeting}.</h1>
-          <p className="mt-3 text-lg text-muted">O que vale guardar hoje?</p>
+          <h1 className="display text-3xl md:text-4xl">{greeting}.</h1>
+          <p className="mt-1 text-muted">O que vale guardar hoje?</p>
         </div>
         <Link
           href="/record"
-          className="hidden items-center gap-2 rounded-full bg-rec px-5 py-2.5 font-semibold text-white transition hover:brightness-110 md:inline-flex"
+          className="hidden items-center gap-2 rounded-md bg-rec px-5 py-2.5 font-semibold text-white transition hover:brightness-110 md:inline-flex"
         >
           <Icon name="mic" className="h-4 w-4" />
           Gravar conversa
@@ -131,7 +131,7 @@ export default async function HomePage() {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-2xl font-bold tracking-tight">{children}</h2>;
+  return <h2 className="mb-3 text-lg font-semibold">{children}</h2>;
 }
 
 function EmptyState() {

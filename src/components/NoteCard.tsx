@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/Icon";
 import { formatDuration, relativeDate } from "@/lib/text";
 import { topicColor } from "@/lib/topicColor";
 import type { NoteListItem } from "@/lib/types";
@@ -50,8 +51,8 @@ export function NoteCard({ note, snippet }: { note: NoteListItem; snippet?: stri
         )}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <h3 className="line-clamp-2 text-lg font-semibold leading-snug text-ink">
-          {note.pinned && <span className="mr-1.5 text-accent" title="Fixada">✦</span>}
+        <h3 className="line-clamp-2 font-medium leading-snug text-ink">
+          {note.pinned && <Icon name="pin" className="mr-1.5 inline h-3.5 w-3.5 align-[-1px] text-accent" />}
           {note.title}
         </h3>
         {snippet ? (
@@ -62,10 +63,10 @@ export function NoteCard({ note, snippet }: { note: NoteListItem; snippet?: stri
             }}
           />
         ) : (
-          note.summary && <p className="line-clamp-2 text-muted">{note.summary}</p>
+          note.summary && <p className="line-clamp-2 text-sm text-muted">{note.summary}</p>
         )}
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-faint">
-          {topic && <span style={{ color: `color-mix(in srgb, ${color} 60%, var(--ink))` }}>{topic.emoji ? `${topic.emoji} ${topic.name}` : topic.name}</span>}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
+          {topic && <span style={{ color: `color-mix(in srgb, ${color} 60%, var(--ink))` }}>{topic.name}</span>}
           <span>{recording ? (note.duration_seconds > 0 ? `gravação de ${formatDuration(note.duration_seconds)}` : "gravação") : "escrita"}</span>
           <span>{relativeDate(note.updated_at)}</span>
           <StatusBadge status={note.status} />

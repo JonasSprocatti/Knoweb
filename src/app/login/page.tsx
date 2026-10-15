@@ -53,10 +53,10 @@ export default function LoginPage() {
     <main className="flex min-h-dvh items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-10">
-          <h1 className="display flex items-start gap-1 text-7xl">
-            knoweb<span className="text-3xl text-accent">✦</span>
-          </h1>
-          <p className="mt-3 text-lg text-muted">Grave, escreva e deixe o Claude ligar os pontos.</p>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/icon.svg" alt="" className="mb-4 h-10 w-10" />
+          <h1 className="display text-3xl">Entrar no Knoweb</h1>
+          <p className="mt-2 text-muted">Grave, escreva e deixe o Claude ligar os pontos.</p>
         </div>
 
         <form onSubmit={submit} className="flex flex-col gap-3">
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
-                className={`rounded-full px-2 py-1.5 transition ${mode === m ? "bg-ink font-semibold text-bg" : "text-muted hover:text-ink"}`}
+                className={`rounded-md px-2 py-1.5 transition ${mode === m ? "bg-ink font-semibold text-bg" : "text-muted hover:text-ink"}`}
               >
                 {label}
               </button>
@@ -86,7 +86,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="seu@email.com"
-            className="rounded-2xl bg-panel px-4 py-3 text-lg text-ink placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent"
+            className="rounded-md border border-line bg-panel px-3.5 py-2.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
           />
           {mode !== "magic" && (
             <input
@@ -97,13 +97,13 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Senha"
-              className="rounded-2xl bg-panel px-4 py-3 text-lg text-ink placeholder:text-faint focus:outline-none focus:ring-2 focus:ring-accent"
+              className="rounded-md border border-line bg-panel px-3.5 py-2.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
             />
           )}
 
           <button
             disabled={busy}
-            className="mt-2 rounded-full bg-accent px-3 py-3 text-lg font-semibold text-on-accent transition hover:brightness-110 disabled:opacity-60"
+            className="mt-2 rounded-md bg-accent px-3 py-2.5 font-medium text-on-accent transition hover:brightness-110 disabled:opacity-60"
           >
             {busy ? "Aguarde…" : mode === "signin" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar link"}
           </button>

@@ -244,7 +244,7 @@ export function NoteView({
             save({ title: e.target.value, content });
           }}
           placeholder="Título"
-          className="w-full bg-transparent text-4xl font-extrabold leading-[1.05] tracking-tight text-ink [font-stretch:85%] placeholder:text-faint focus:outline-none md:text-5xl"
+          className="w-full bg-transparent text-2xl font-semibold leading-tight tracking-tight text-ink placeholder:text-faint focus:outline-none md:text-3xl"
         />
 
         <section className="flex flex-col gap-2">
@@ -252,14 +252,14 @@ export function NoteView({
             <button
               onClick={() => setEditing(false)}
               aria-pressed={!editing}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${!editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 ${!editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
             >
               <Icon name="eye" className="h-3.5 w-3.5" /> Ler
             </button>
             <button
               onClick={() => setEditing(true)}
               aria-pressed={editing}
-              className={`flex items-center gap-1.5 rounded-full px-3 py-1 ${editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1 ${editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
             >
               <Icon name="edit" className="h-3.5 w-3.5" /> Editar
             </button>
@@ -283,7 +283,7 @@ export function NoteView({
           ) : (
             <button
               onClick={() => setEditing(true)}
-              className="rounded-2xl border border-dashed border-line p-4 text-left text-faint hover:border-accent hover:text-muted"
+              className="rounded-lg border border-dashed border-line p-4 text-left text-faint hover:border-accent hover:text-muted"
             >
               {note.kind === "recording" ? "Adicionar anotações próprias a esta gravação…" : "Escreva algo…"}
             </button>
@@ -302,18 +302,16 @@ export function NoteView({
 
       {/* ===================== Painel do Claude ===================== */}
       <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-6">
-        <section className="rounded-3xl bg-panel p-5">
+        <section className="rounded-lg border border-line bg-panel p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="flex items-center gap-1.5 text-xl font-bold tracking-tight">
-              <span className="text-accent" aria-hidden>
-                ✦
-              </span>
+            <h2 className="flex items-center gap-1.5 text-base font-semibold">
+              <Icon name="sparkle" className="h-4 w-4 text-accent" />
               Análise do Claude
             </h2>
             <button
               onClick={runAnalysis}
               disabled={busy || processing}
-              className="rounded-full bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink disabled:opacity-50"
+              className="rounded-md bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink disabled:opacity-50"
             >
               {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar"}
             </button>
@@ -359,7 +357,7 @@ export function NoteView({
         </section>
 
         <section>
-          <h2 className="mb-2 text-xl font-bold tracking-tight">Temas</h2>
+          <h2 className="mb-2 text-base font-semibold">Temas</h2>
           <div className="flex flex-wrap gap-2">
             {topics.map((t) => (
               <TopicChip key={t.id} topic={t}>
@@ -374,14 +372,14 @@ export function NoteView({
                 onChange={(e) => setNewTopic(e.target.value)}
                 placeholder="+ tema"
                 aria-label="Adicionar tema"
-                className="w-28 rounded-full border border-dashed border-line bg-transparent px-3 py-0.5 text-sm text-ink placeholder:text-faint focus:w-40 focus:border-accent focus:outline-none"
+                className="w-28 rounded-md border border-dashed border-line bg-transparent px-3 py-0.5 text-sm text-ink placeholder:text-faint focus:w-40 focus:border-accent focus:outline-none"
               />
             </form>
           </div>
         </section>
 
         <section>
-          <h2 className="mb-2 text-xl font-bold tracking-tight">Imagem na teia</h2>
+          <h2 className="mb-2 text-base font-semibold">Imagem na teia</h2>
           <CoverPicker table="notes" id={note.id} initialPath={note.cover_path ?? null} />
         </section>
 
@@ -425,7 +423,7 @@ function LinkGroup({ label, links, showReason }: { label: string; links: LinkedN
   const unique = [...new Map(links.map((l) => [l.id, l])).values()];
   return (
     <section>
-      <h2 className="mb-2 text-xl font-bold tracking-tight">{label}</h2>
+      <h2 className="mb-2 text-base font-semibold">{label}</h2>
       <ul className="flex flex-col">
         {unique.map((l) => (
           <li key={l.id}>

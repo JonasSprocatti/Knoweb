@@ -4,36 +4,34 @@
    Tokens de cor — claro por padrão do sistema, escuro automático
    ------------------------------------------------------------------ */
 :root {
-  /* Dia: papel azulado, tinta violeta */
-  --bg: #eef0fb;
-  --surface: #e4e7f7;
+  --bg: #f6f7f9;
+  --surface: #eef0f3;
   --panel: #ffffff;
-  --line: #cdd2ee;
-  --ink: #161a44;
-  --muted: #464c84;
-  --faint: #6b71a3;
-  --accent: #5b3df5;
+  --line: #e1e4ea;
+  --ink: #161a23;
+  --muted: #4a5263;
+  --faint: #737b8c;
+  --accent: #2347c5;
   --on-accent: #ffffff;
-  --topic: #0f8f73;
-  --rec: #e23355;
-  --link: #4b30d9;
+  --topic: #2f8f83;
+  --rec: #c8323c;
+  --link: #2347c5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Noite: céu índigo, estrela pólen */
-    --bg: #0e1233;
-    --surface: #131845;
-    --panel: #1a2055;
-    --line: #2a3170;
-    --ink: #edefff;
-    --muted: #aab0da;
-    --faint: #7a82b6;
-    --accent: #ffd23f;
-    --on-accent: #1b1640;
-    --topic: #5ee6c3;
-    --rec: #ff5d73;
-    --link: #9dbeff;
+    --bg: #15181f;
+    --surface: #1a1e26;
+    --panel: #1f242e;
+    --line: #2c323e;
+    --ink: #e7e9ee;
+    --muted: #a4abb8;
+    --faint: #7a8291;
+    --accent: #7c9cff;
+    --on-accent: #0f1630;
+    --topic: #5cc4b5;
+    --rec: #ef6670;
+    --link: #8fabff;
   }
 }
 
@@ -50,7 +48,7 @@
   --color-topic: var(--topic);
   --color-rec: var(--rec);
   --color-link: var(--link);
-  --font-sans: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-plex), ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -62,7 +60,7 @@ body {
 
 body {
   -webkit-font-smoothing: antialiased;
-  font-optical-sizing: auto;
+  font-feature-settings: "tnum" 0;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -75,13 +73,11 @@ body {
   outline-offset: 2px;
 }
 
-/* Títulos de página: estreitos, pesados, em minúsculas. A personalidade do app mora aqui. */
+/* Títulos de página: sóbrios, firmes */
 .display {
-  font-weight: 800;
-  font-stretch: 78%;
-  letter-spacing: -0.03em;
-  line-height: 0.92;
-  text-transform: lowercase;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
 }
 
 @media (prefers-reduced-motion: reduce) {

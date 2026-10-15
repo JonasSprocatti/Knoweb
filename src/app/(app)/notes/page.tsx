@@ -36,7 +36,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="display text-6xl md:text-7xl">Notas</h1>
+        <h1 className="display text-3xl md:text-4xl">Notas</h1>
         <NewNoteButton />
       </header>
 
@@ -46,7 +46,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
             key={f.key}
             href={f.key ? `/notes?tipo=${f.key}` : "/notes"}
             aria-current={tipo === f.key ? "page" : undefined}
-            className={`rounded-full px-3.5 py-1 transition ${tipo === f.key ? "bg-ink text-bg" : "text-muted hover:bg-panel hover:text-ink"}`}
+            className={`rounded-md px-3.5 py-1 transition ${tipo === f.key ? "bg-ink text-bg" : "text-muted hover:bg-panel hover:text-ink"}`}
           >
             {f.label}
           </Link>
