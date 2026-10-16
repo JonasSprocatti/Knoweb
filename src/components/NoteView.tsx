@@ -77,6 +77,16 @@ export function NoteView({
   useEffect(() => setTopics(initialTopics), [initialTopics]);
   useEffect(() => setFiles(initialFiles), [initialFiles]); // nota nova: o anexo entra enquanto ela é lida
 
+  // Ao recarregar do servidor (fim da análise), o que veio de lá vale, menos o que você está digitando.
+  // Cobre o caso de o aviso em tempo real não chegar (textos muito grandes passam do limite dele).
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  useEffect(() => {
+    setNote(initialNote);
+    if (!dirtyRef.current.title) setTitle(initialNote.title);
+    if (!dirtyRef.current.content && !editingRef.current) setContent(initialNote.content);
+  }, [initialNote]);
+
   // ---- Autosave ------------------------------------------------------
   const save = useMemo(
     () =>
@@ -119,14 +129,16 @@ export function NoteView({
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "notes", filter: `id=eq.${initialNote.id}` },
         (payload) => {
-          const next = payload.new as Note;
+          // Textos grandes que não mudaram não vêm no aviso (o Postgres só manda o que mudou):
+          // campo ausente = mantém o que já está na tela
+          const next = payload.new as Partial<Note>;
           setNote((prev) => {
             const finishedAnalysis = prev.status === "analyzing" && next.status === "ready";
             if (finishedAnalysis) setTimeout(() => router.refresh(), 300);
             return { ...prev, ...next };
           });
-          if (!dirtyRef.current.title) setTitle(next.title);
-          if (!dirtyRef.current.content && !editing) setContent(next.content);
+          if (!dirtyRef.current.title && typeof next.title === "string") setTitle(next.title);
+          if (!dirtyRef.current.content && !editing && typeof next.content === "string") setContent(next.content);
         },
       )
       .on(
