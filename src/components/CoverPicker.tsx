@@ -15,7 +15,7 @@ export function CoverPicker({ table, id, initialPath }: { table: "notes" | "topi
     if (!path) return setPreview(null);
     supabaseBrowser()
       .storage.from("images")
-      .createSignedUrl(path, 3600)
+      .createSignedUrl(path, 600)
       .then(({ data }) => setPreview(data?.signedUrl ?? null));
   }, [path]);
 

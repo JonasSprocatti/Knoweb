@@ -94,7 +94,7 @@ export async function GET() {
   const paths = [...(notes.data ?? []), ...(topics.data ?? [])].map((r) => r.cover_path as string | null).filter((p): p is string => !!p);
   const urlByPath = new Map<string, string>();
   if (paths.length) {
-    const { data: signed } = await supabase.storage.from("images").createSignedUrls(paths, 60 * 60 * 6);
+    const { data: signed } = await supabase.storage.from("images").createSignedUrls(paths, 60 * 60);
     for (const s of signed ?? []) if (s.path && s.signedUrl) urlByPath.set(s.path, s.signedUrl);
   }
   const imageOf = (p: string | null) => (p ? (urlByPath.get(p) ?? null) : null);
