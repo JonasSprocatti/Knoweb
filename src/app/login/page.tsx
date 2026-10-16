@@ -4,50 +4,33 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabaseBrowser } from "@/lib/supabase/client";
 
-type Mode = "signin" | "signup" | "magic";
-
+/**
+ * Só e-mail e senha. Não há "criar conta" nem link por e-mail: o app é de uma
+ * pessoa só, contas novas são criadas no painel do Supabase (e os cadastros
+ * ficam desligados lá).
+ */
 export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setMessage(null);
-    const supabase = supabaseBrowser();
-    const redirect = `${window.location.origin}/auth/callback`;
-    try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        router.replace("/");
-        router.refresh();
-        return;
-      }
-      if (mode === "signup") {
-        const { data, error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
-        if (error) throw error;
-        if (data.session) {
-          router.replace("/");
-          router.refresh();
-          return;
-        }
-        setMessage({ kind: "ok", text: "Conta criada. Confirme pelo link que chegou no seu e-mail." });
-      } else {
-        const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect } });
-        if (error) throw error;
-        setMessage({ kind: "ok", text: "Enviamos um link de acesso para o seu e-mail." });
-      }
-    } catch (err) {
-      setMessage({ kind: "err", text: err instanceof Error ? err.message : String(err) });
-    } finally {
+    setError(null);
+    const { error } = await supabaseBrowser().auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message === "Invalid login credentials" ? "E-mail ou senha incorretos." : error.message);
       setBusy(false);
+      return;
     }
+    router.replace("/");
+    router.refresh();
   }
+
+  const field = "rounded-md border border-line bg-panel px-3.5 py-2.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none";
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-4">
@@ -60,57 +43,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={submit} className="flex flex-col gap-3">
-          <div className="mb-2 grid grid-cols-3 gap-1 rounded-full bg-panel p-1 text-sm">
-            {(
-              [
-                ["signin", "Entrar"],
-                ["signup", "Criar conta"],
-                ["magic", "Link por e-mail"],
-              ] as [Mode, string][]
-            ).map(([m, label]) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={`rounded-md px-2 py-1.5 transition ${mode === m ? "bg-ink font-semibold text-bg" : "text-muted hover:text-ink"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="seu@email.com"
-            className="rounded-md border border-line bg-panel px-3.5 py-2.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
-          />
-          {mode !== "magic" && (
-            <input
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Senha"
-              className="rounded-md border border-line bg-panel px-3.5 py-2.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
-            />
-          )}
-
-          <button
-            disabled={busy}
-            className="mt-2 rounded-md bg-accent px-3 py-2.5 font-medium text-on-accent transition hover:brightness-110 disabled:opacity-60"
-          >
-            {busy ? "Aguarde…" : mode === "signin" ? "Entrar" : mode === "signup" ? "Criar conta" : "Enviar link"}
+          <input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" aria-label="E-mail" className={field} />
+          <input type="password" required autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" aria-label="Senha" className={field} />
+          <button disabled={busy} className="press mt-2 rounded-md bg-accent px-3 py-2.5 font-medium text-on-accent transition hover:brightness-110 disabled:opacity-60">
+            {busy ? "Entrando…" : "Entrar"}
           </button>
-
-          {message && (
-            <p className={`text-sm ${message.kind === "ok" ? "text-topic" : "text-rec"}`}>{message.text}</p>
-          )}
+          {error && <p className="text-sm text-rec">{error}</p>}
         </form>
       </div>
     </main>
