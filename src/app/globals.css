@@ -7,6 +7,7 @@
    Tokens de cor — claro por padrão do sistema, escuro automático
    ------------------------------------------------------------------ */
 :root {
+  color-scheme: light;
   --bg: #f6f3ee;
   --surface: #fbf9f5;
   --panel: #ffffff;
@@ -14,15 +15,14 @@
   --ink: #1f1b16;
   --muted: #5f574c;
   --faint: #8a8073;
-  --accent: #a8691a;
-  --on-accent: #ffffff;
   --topic: #2f7d73;
   --rec: #d23c32;
-  --link: #8a4f0b;
 }
 
+/* Escuro: segue o sistema, a não ser que você tenha escolhido claro ou escuro em Configurações */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #14120f;
     --surface: #1a1814;
     --panel: #201d18;
@@ -30,12 +30,55 @@
     --ink: #ece6dc;
     --muted: #b3aa9c;
     --faint: #8a8174;
-    --accent: #e0a64f;
-    --on-accent: #1a1408;
     --topic: #6cc3b5;
     --rec: #f0584d;
-    --link: #f0bd6e;
   }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14120f;
+  --surface: #1a1814;
+  --panel: #201d18;
+  --line: #2f2b24;
+  --ink: #ece6dc;
+  --muted: #b3aa9c;
+  --faint: #8a8174;
+  --topic: #6cc3b5;
+  --rec: #f0584d;
+}
+
+/* Paletas (Configurações). light-dark() escolhe o tom pelo tema claro/escuro.
+   Padrão "Knoweb": o azul-esverdeado e o âmbar da logo. */
+:root,
+:root[data-palette="knoweb"] {
+  --accent: light-dark(#23877b, #6cc3b5);
+  --on-accent: light-dark(#ffffff, #0c1f1c);
+  --link: light-dark(#8a4f0b, #e0a64f);
+}
+:root[data-palette="ambar"] {
+  --accent: light-dark(#a8691a, #e0a64f);
+  --on-accent: light-dark(#ffffff, #1a1408);
+  --link: light-dark(#8a4f0b, #f0bd6e);
+}
+:root[data-palette="cobalto"] {
+  --accent: light-dark(#2f5fb3, #7fa6f0);
+  --on-accent: light-dark(#ffffff, #0d1730);
+  --link: light-dark(#2f5fb3, #9db9f4);
+}
+:root[data-palette="violeta"] {
+  --accent: light-dark(#7046b0, #b49af0);
+  --on-accent: light-dark(#ffffff, #1b1030);
+  --link: light-dark(#7046b0, #c4b0f4);
+}
+:root[data-palette="grafite"] {
+  --accent: light-dark(#3a4048, #c9ced6);
+  --on-accent: light-dark(#ffffff, #16181c);
+  --link: light-dark(#23877b, #6cc3b5);
+}
+
+/* Tamanho do texto */
+:root[data-size="grande"] {
+  font-size: 112.5%;
 }
 
 @theme inline {
@@ -88,6 +131,50 @@ body {
    ------------------------------------------------------------------ */
 html {
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Tudo que se toca muda de cor e borda suavemente, nada "pisca" */
+a,
+button,
+select,
+input,
+textarea,
+summary,
+label {
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Listas entram em cascata (só ao montar a tela) */
+main li {
+  animation: page-in 0.32s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+main li:nth-child(2) { animation-delay: 0.03s; }
+main li:nth-child(3) { animation-delay: 0.06s; }
+main li:nth-child(4) { animation-delay: 0.09s; }
+main li:nth-child(5) { animation-delay: 0.12s; }
+main li:nth-child(6) { animation-delay: 0.15s; }
+main li:nth-child(n + 7) { animation-delay: 0.18s; }
+
+/* Cartões e linhas clicáveis "levantam" um pouco no mouse */
+@media (hover: hover) {
+  main a.press:hover,
+  main li > a:hover {
+    transform: translateY(-1px);
+  }
+}
+
+/* Abrir um <details> desliza o conteúdo */
+details[open] > :not(summary) {
+  animation: page-in 0.22s ease both;
 }
 @media (prefers-reduced-motion: no-preference) {
   html {
@@ -183,6 +270,14 @@ dialog[open]::backdrop {
   border-radius: 0.5rem;
   background: var(--panel);
   animation: shimmer 1.2s ease-in-out infinite;
+}
+
+:root[data-motion="reduce"] *,
+:root[data-motion="reduce"] *::before,
+:root[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  transition-duration: 0.01ms !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -254,7 +254,7 @@ export function GraphView() {
             <input
               value={find}
               onChange={(e) => setFind(e.target.value)}
-              placeholder="Achar um ponto"
+              placeholder="Buscar ponto"
               aria-label="Achar um ponto na teia"
               className="w-full rounded-md border border-line bg-panel px-3 py-1.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
             />
@@ -441,7 +441,7 @@ export function GraphView() {
               }
 
               const isTopicLabel = node.type === "topic" && theme.topicIsLabel;
-              const showLabel = !isTopicLabel && (isHub(node) ? scale > 0.6 : scale > 1.6 || hover === node.id || (hover && lit));
+              const showLabel = !isTopicLabel && (isHub(node) ? scale > 1.1 || node.weight >= 6 || hover === node.id : scale > 1.6 || hover === node.id || (hover && lit));
               if (showLabel) {
                 const fontSize = (isHub(node) ? 13 : 11) / scale;
                 ctx.font = `${isHub(node) ? 650 : 450} ${fontSize}px ${font}`;

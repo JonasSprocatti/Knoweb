@@ -23,9 +23,29 @@ const NAV = [
 
 // No celular: quatro atalhos + "Mais" (gaveta com o resto, a conta e o sair)
 const MOBILE_NAV = ["/", "/notes", "/record", "/tasks"];
-const MORE = [...NAV.filter((n) => !MOBILE_NAV.includes(n.href)), { href: "/templates", label: "Modelos", icon: "folder" }].sort(
+const MORE = [...NAV.filter((n) => !MOBILE_NAV.includes(n.href)), { href: "/templates", label: "Modelos", icon: "folder" }, { href: "/settings", label: "Configurações", icon: "gear" }].sort(
   (a, b) => Number(b.href === "/graph") - Number(a.href === "/graph"),
 );
+
+// Telas de topo (no menu) não têm "voltar"; as de dentro (uma nota, um projeto…) têm
+const TOP = new Set(["/", ...NAV.map((n) => n.href), "/templates", "/settings", "/search"]);
+const parentOf = (path: string) => path.split("/").slice(0, -1).join("/") || "/";
+
+function BackButton({ path, className = "" }: { path: string; className?: string }) {
+  const router = useRouter();
+  if (TOP.has(path)) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => (window.history.length > 1 ? router.back() : router.push(parentOf(path)))}
+      aria-label="Voltar"
+      className={`press flex shrink-0 items-center gap-1 rounded-md text-muted hover:text-ink ${className}`}
+    >
+      <Icon name="back" className="h-5 w-5" />
+      <span className="hidden text-sm md:inline">Voltar</span>
+    </button>
+  );
+}
 
 function isActive(path: string, href: string) {
   return href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
@@ -112,6 +132,9 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
             {email}
           </span>
           {ai && <AiSelect ai={ai} />}
+          <Link href="/settings" className="rounded p-1 hover:text-ink" title="Configurações" aria-label="Configurações">
+            <Icon name="gear" className="h-4 w-4" />
+          </Link>
           <form action="/auth/signout" method="post">
             <button className="rounded p-1 hover:text-ink" title="Sair" aria-label="Sair">
               <Icon name="logout" className="h-4 w-4" />
@@ -124,10 +147,14 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topo (celular) */}
         <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
-          <Link href="/" className="shrink-0" aria-label="Knoweb, início">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icon.svg" alt="" className="h-7 w-7" />
-          </Link>
+          {TOP.has(path) ? (
+            <Link href="/" className="shrink-0" aria-label="Knoweb, início">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icon.svg" alt="" className="h-7 w-7" />
+            </Link>
+          ) : (
+            <BackButton path={path} className="-ml-1 h-8 w-8 justify-center" />
+          )}
           <form onSubmit={search} className="min-w-0 flex-1">
             <label className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-1.5 text-sm">
               <Icon name="search" className="h-4 w-4 text-faint" />
@@ -143,7 +170,10 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
           <NewNoteButton label="" className="px-2.5" />
         </header>
 
-        <main className="flex-1 px-4 pb-28 pt-5 md:px-10 md:pb-12 md:pt-8">{children}</main>
+        <main className="flex-1 px-4 pb-28 pt-5 md:px-10 md:pb-12 md:pt-8">
+          <BackButton path={path} className="mb-3 hidden md:flex" />
+          {children}
+        </main>
       </div>
 
       {/* ---------------- Navegação inferior (celular) ---------------- */}

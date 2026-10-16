@@ -105,11 +105,15 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
   const overdue = task.due_date && isOpen(task.status) && task.due_date < today();
   return (
     <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 transition-opacity last:border-0 ${task.status === "done" || task.status === "canceled" ? "opacity-70" : ""}`}>
-      <StatusDot status={task.status} />
-      <Link href={`/tasks/${task.id}`} className={`min-w-0 flex-1 ${task.status === "done" ? "text-faint line-through" : "text-ink"} hover:underline`}>
-        <span className="mr-2 text-xs tabular-nums text-faint">{taskCode(task.number)}</span>
-        {task.title}
-      </Link>
+      {/* No celular o título ocupa a linha inteira; as etiquetas vão para a linha de baixo */}
+      <span className="flex min-w-0 basis-full items-center gap-3 sm:basis-0 sm:flex-1">
+        <StatusDot status={task.status} />
+        <Link href={`/tasks/${task.id}`} className={`min-w-0 flex-1 ${task.status === "done" ? "text-faint line-through" : "text-ink"} hover:underline`}>
+          <span className="mr-2 text-xs tabular-nums text-faint">{taskCode(task.number)}</span>
+          {task.title}
+        </Link>
+      </span>
+      <span className="w-2.5 sm:hidden" aria-hidden />
       {showProject && task.projects && (
         <Link href={`/projects/${task.projects.slug}`} className="flex items-center gap-1 text-xs text-muted hover:text-ink">
           <span className="h-2 w-2 rounded-full" style={{ background: projectColor(task.projects) }} aria-hidden />

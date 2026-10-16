@@ -76,20 +76,6 @@ export default async function HomePage() {
 
       <QuickCapture />
 
-      <nav className="flex gap-2 overflow-x-auto text-sm md:hidden">
-        {[
-          ["/projects", "Projetos"],
-          ["/tasks", "Tarefas"],
-          ["/sprints", "Sprints"],
-          ["/people", "Pessoas"],
-          ["/topics", "Temas"],
-          ["/ask", "Perguntar"],
-        ].map(([href, label]) => (
-          <Link key={href} href={href} className="shrink-0 rounded-md border border-line bg-panel px-3 py-1.5 text-ink">
-            {label}
-          </Link>
-        ))}
-      </nav>
 
       {((sugProjects ?? 0) > 0 || (sugTasks ?? 0) > 0) && (
         <Link href={(sugProjects ?? 0) > 0 ? "/projects" : "/tasks?estado=sugeridas"} className="flex items-center gap-3 rounded-lg border border-dashed border-accent/60 bg-panel px-4 py-3 text-sm hover:border-accent">
