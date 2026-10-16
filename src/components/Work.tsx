@@ -162,20 +162,9 @@ export function TaskList({ tasks, showProject, empty }: { tasks: TaskRow[]; show
   );
 }
 
-/** Quadro (como o Board do Notion): uma coluna por status. */
-export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProject?: boolean }) {
+function BoardCard({ t, showProject }: { t: TaskRow; showProject?: boolean }) {
   return (
-    <div className="grid gap-4 md:grid-cols-4">
-      {BOARD.map((s) => {
-        const col = tasks.filter((t) => t.status === s);
-        return (
-          <section key={s} className="rounded-lg border border-line bg-surface p-2">
-            <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold">
-              <StatusDot status={s} /> {TASK_STATUS[s].label} <span className="font-normal text-faint">{col.length}</span>
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {col.map((t) => (
-                <li key={t.id} className="rounded-md border border-line border-l-[3px] bg-panel p-2.5 text-sm" style={{ borderLeftColor: TASK_STATUS[t.status].color }}>
+    <li className="rounded-md border border-line border-l-[3px] bg-panel p-2.5 text-sm" style={{ borderLeftColor: TASK_STATUS[t.status].color }}>
                   <Link href={`/tasks/${t.id}`} className="block text-ink hover:underline">
                     <span className="mr-1.5 text-xs text-faint">{taskCode(t.number)}</span>
                     {t.title}
@@ -191,8 +180,36 @@ export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProjec
                     <StatusSelect id={t.id} status={t.status} />
                   </div>
                 </li>
+  );
+}
+
+/** Quadro (como o Board do Notion): uma coluna por status. */
+export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProject?: boolean }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-4">
+      {BOARD.map((s) => {
+        const col = tasks.filter((t) => t.status === s);
+        return (
+          <section key={s} className="rounded-lg border border-line bg-surface p-2">
+            <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold">
+              <StatusDot status={s} /> {TASK_STATUS[s].label} <span className="font-normal text-faint">{col.length}</span>
+            </h3>
+            <ul className="flex flex-col gap-2">
+              {(s === "done" ? col.slice(0, 4) : col).map((t) => (
+                <BoardCard key={t.id} t={t} showProject={showProject} />
               ))}
             </ul>
+            {/* Feitas: só as 4 mais recentes à vista, o resto num clique */}
+            {s === "done" && col.length > 4 && (
+              <details className="mt-2">
+                <summary className="cursor-pointer px-1 text-sm text-muted hover:text-ink">Ver mais {col.length - 4} feitas</summary>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {col.slice(4).map((t) => (
+                    <BoardCard key={t.id} t={t} showProject={showProject} />
+                  ))}
+                </ul>
+              </details>
+            )}
           </section>
         );
       })}

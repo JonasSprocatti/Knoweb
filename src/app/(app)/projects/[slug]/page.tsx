@@ -133,6 +133,59 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             </form>
           </div>
         )}
+        <details className="max-w-xl rounded-lg border border-line bg-panel p-4">
+            <summary className="cursor-pointer font-semibold">Editar projeto</summary>
+            <form action={saveProject} className="mt-3 flex flex-col gap-2">
+              <input type="hidden" name="id" value={project.id} />
+              <div className="flex gap-2">
+                <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+                  Ícone
+                  <input name="emoji" defaultValue={project.emoji ?? ""} placeholder="📁" maxLength={8} title="Um emoji que aparece ao lado do nome e na teia" className={`${input} text-center`} />
+                </label>
+                <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
+                  Nome
+                  <input name="name" required defaultValue={project.name} className={input} />
+                </label>
+              </div>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Objetivo
+                <textarea name="description" defaultValue={project.description ?? ""} rows={3} placeholder="O que este projeto precisa entregar" className={input} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Status
+              <select name="status" defaultValue={project.status} className={input}>
+                {Object.entries(PROJECT_STATUS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Responsável
+              <select name="owner_id" defaultValue={owner?.id ?? ""} className={input}>
+                <option value="">Sem responsável</option>
+                {(people ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              </label>
+              <label className="flex items-center justify-between gap-2 text-sm text-muted">Início <input type="date" name="start_date" defaultValue={project.start_date ?? ""} className={input} /></label>
+              <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
+              <SaveButton />
+            </form>
+            <form action={templateFromProject.bind(null, project.id)} className="mt-3">
+              <button className="text-sm text-muted hover:text-ink hover:underline">Salvar como modelo</button>
+            </form>
+            <div className="mt-3">
+              <ConfirmDelete action={deleteProject.bind(null, project.id, "/projects")} title={`Excluir o projeto “${project.name}”?`} label="Excluir projeto">
+                <p className="font-medium">Tarefas ({real.length + suggested.length})</p>
+                <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Elas continuam existindo, sem projeto." />
+                <DeleteOption name="tasks" value="delete" label="Excluir as tarefas junto" />
+                <p className="mt-2 font-medium">Notas ligadas ({notes.length})</p>
+                <DeleteOption name="notes" value="keep" defaultChecked label="Manter as notas" hint="Só o vínculo com o projeto some." />
+                <DeleteOption name="notes" value="delete" label="Excluir as notas ligadas também" hint="Inclui os áudios delas." />
+              </ConfirmDelete>
+            </div>
+          </details>
       </header>
 
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -261,59 +314,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             </form>
           </section>
 
-          <details className="rounded-lg border border-line bg-panel p-4">
-            <summary className="cursor-pointer font-semibold">Editar projeto</summary>
-            <form action={saveProject} className="mt-3 flex flex-col gap-2">
-              <input type="hidden" name="id" value={project.id} />
-              <div className="flex gap-2">
-                <label className="flex w-16 flex-col gap-1 text-xs text-muted">
-                  Ícone
-                  <input name="emoji" defaultValue={project.emoji ?? ""} placeholder="📁" maxLength={8} title="Um emoji que aparece ao lado do nome e na teia" className={`${input} text-center`} />
-                </label>
-                <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
-                  Nome
-                  <input name="name" required defaultValue={project.name} className={input} />
-                </label>
-              </div>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                Objetivo
-                <textarea name="description" defaultValue={project.description ?? ""} rows={3} placeholder="O que este projeto precisa entregar" className={input} />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                Status
-              <select name="status" defaultValue={project.status} className={input}>
-                {Object.entries(PROJECT_STATUS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-muted">
-                Responsável
-              <select name="owner_id" defaultValue={owner?.id ?? ""} className={input}>
-                <option value="">Sem responsável</option>
-                {(people ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              </label>
-              <label className="flex items-center justify-between gap-2 text-sm text-muted">Início <input type="date" name="start_date" defaultValue={project.start_date ?? ""} className={input} /></label>
-              <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
-              <SaveButton />
-            </form>
-            <form action={templateFromProject.bind(null, project.id)} className="mt-3">
-              <button className="text-sm text-muted hover:text-ink hover:underline">Salvar como modelo</button>
-            </form>
-            <div className="mt-3">
-              <ConfirmDelete action={deleteProject.bind(null, project.id, "/projects")} title={`Excluir o projeto “${project.name}”?`} label="Excluir projeto">
-                <p className="font-medium">Tarefas ({real.length + suggested.length})</p>
-                <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Elas continuam existindo, sem projeto." />
-                <DeleteOption name="tasks" value="delete" label="Excluir as tarefas junto" />
-                <p className="mt-2 font-medium">Notas ligadas ({notes.length})</p>
-                <DeleteOption name="notes" value="keep" defaultChecked label="Manter as notas" hint="Só o vínculo com o projeto some." />
-                <DeleteOption name="notes" value="delete" label="Excluir as notas ligadas também" hint="Inclui os áudios delas." />
-              </ConfirmDelete>
-            </div>
-          </details>
 
           <Link
             href={`/ask?q=${encodeURIComponent(`Como está o projeto ${project.name}? Resuma o que foi discutido, decisões, riscos e próximos passos.`)}`}

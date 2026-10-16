@@ -24,6 +24,7 @@ export function Transcript({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [current, setCurrent] = useState<{ seq: number; url: string } | null>(null);
   const [open, setOpen] = useState(true);
+  const [full, setFull] = useState(false); // transcrição longa abre resumida
   const urlCache = useRef(new Map<string, string>());
 
   const offsets: { seg: AudioSegment; start: number; end: number }[] = [];
@@ -131,8 +132,8 @@ export function Transcript({
       )}
 
       {open && paragraphs.length > 0 && (
-        <div className="flex flex-col gap-3 text-[15px] leading-relaxed">
-          {paragraphs.map((p, i) => (
+        <div className="relative flex flex-col gap-3 text-[15px] leading-relaxed">
+          {(full ? paragraphs : paragraphs.slice(0, 2)).map((p, i) => (
             <p key={i} className="text-ink/90">
               {p.ts && (
                 <button
@@ -146,6 +147,14 @@ export function Transcript({
               {p.text}
             </p>
           ))}
+          {paragraphs.length > 2 && (
+            <button
+              onClick={() => setFull((f) => !f)}
+              className="press self-start rounded-md border border-line px-3 py-1.5 text-sm font-medium text-accent hover:border-accent"
+            >
+              {full ? "Mostrar menos" : `Ver transcrição completa (${paragraphs.length} trechos)`}
+            </button>
+          )}
         </div>
       )}
     </section>

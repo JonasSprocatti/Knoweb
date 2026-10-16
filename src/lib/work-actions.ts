@@ -32,7 +32,7 @@ const must = <T,>({ data, error }: { data: T; error: { message: string } | null 
 const refresh = () => revalidatePath("/", "layout");
 
 /** Slug livre: "Site novo", "Site novo 2", ... */
-async function freeSlug(supabase: SupabaseClient, table: "projects" | "people", name: string, exceptId?: string | null) {
+async function freeSlug(supabase: SupabaseClient, table: "projects" | "people" | "topics", name: string, exceptId?: string | null) {
   const base = slugify(name) || "sem-nome";
   const { data } = await supabase.from(table).select("id, slug").like("slug", `${base}%`);
   const taken = new Set((data ?? []).filter((r) => r.id !== exceptId).map((r) => r.slug as string));
@@ -621,4 +621,22 @@ export async function unlinkSystem(entityId: string, type: string, targetId: str
   const supabase = await db();
   must(await supabase.from("entity_links").delete().eq("entity_id", entityId).eq("target_type", type).eq("target_id", targetId));
   refresh();
+}
+
+/** Edita o tema: nome (o endereço acompanha), emoji, descrição e cor. */
+export async function saveTopic(id: string, form: FormData) {
+  const supabase = await db();
+  const name = str(form, "name");
+  if (!name) throw new Error("Escreva o nome.");
+  const color = str(form, "color");
+  const row = {
+    name,
+    slug: await freeSlug(supabase, "topics", name, id),
+    emoji: str(form, "emoji")?.slice(0, 8) ?? null,
+    description: str(form, "description"),
+    color: color && /^#[0-9a-f]{6}$/i.test(color) ? color : null,
+  };
+  const saved = must(await supabase.from("topics").update(row).eq("id", id).select("slug").single());
+  refresh();
+  redirect(`/topics/${saved.slug}`);
 }

@@ -84,6 +84,44 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             </Link>
           )}
           {person.about && <p className="max-w-2xl text-muted">{person.about}</p>}
+<details className="max-w-xl rounded-lg border border-line bg-panel p-4">
+          <summary className="cursor-pointer font-semibold">Editar</summary>
+          <form action={savePerson} className="mt-3 flex flex-col gap-2">
+            <input type="hidden" name="id" value={person.id} />
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Nome
+              <input name="name" required defaultValue={person.name} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Cargo / papel
+              <input name="role" defaultValue={person.role ?? ""} placeholder="Ex.: analista de RH, cliente, designer" className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Empresa
+              <select name="company_id" defaultValue={person.company_id ?? ""} className={input}>
+                <option value="">Nenhuma</option>
+                {(companies ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              E-mail
+              <input name="email" type="email" defaultValue={person.email ?? ""} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              O que faz
+              <textarea name="about" defaultValue={person.about ?? ""} rows={4} placeholder="Do que cuida, em que é bom, que sistemas usa. O Claude usa isso para escolher a pessoa certa ao sugerir tarefas." className={input} />
+            </label>
+            <SaveButton />
+          </form>
+          <div className="mt-3">
+            <ConfirmDelete action={deletePerson.bind(null, person.id)} title={`Excluir ${person.name}?`} label="Excluir pessoa">
+              <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Ela sai das tarefas e das notas; as tarefas ficam." />
+              <DeleteOption name="tasks" value="delete" label="Excluir as tarefas que só ela fazia" hint="Tarefas com outros responsáveis ficam." />
+            </ConfirmDelete>
+          </div>
+        </details>
         </header>
 
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -116,7 +154,8 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
           <section>
             <h2 className="mb-2 text-lg font-semibold">Atividade</h2>
             <ol className="flex flex-col border-l border-line pl-4 text-sm">
-              {events.map((e) => {
+              {/* Mesmo evento repetido em sequência (ex.: "Recebeu" duas vezes) aparece uma vez só */}
+              {events.filter((e, i) => !(i > 0 && events[i - 1].task_id === e.task_id && events[i - 1].kind === e.kind && events[i - 1].new_value === e.new_value)).map((e) => {
                 const t = byTask.get(e.task_id as string);
                 return (
                   <li key={e.id} className="py-1.5">
@@ -180,44 +219,6 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
           Perguntar ao Claude
         </Link>
 
-        <details className="rounded-lg border border-line bg-panel p-4">
-          <summary className="cursor-pointer font-semibold">Editar</summary>
-          <form action={savePerson} className="mt-3 flex flex-col gap-2">
-            <input type="hidden" name="id" value={person.id} />
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Nome
-              <input name="name" required defaultValue={person.name} className={input} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Cargo / papel
-              <input name="role" defaultValue={person.role ?? ""} placeholder="Ex.: analista de RH, cliente, designer" className={input} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Empresa
-              <select name="company_id" defaultValue={person.company_id ?? ""} className={input}>
-                <option value="">Nenhuma</option>
-                {(companies ?? []).map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              E-mail
-              <input name="email" type="email" defaultValue={person.email ?? ""} className={input} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              O que faz
-              <textarea name="about" defaultValue={person.about ?? ""} rows={4} placeholder="Do que cuida, em que é bom, que sistemas usa. O Claude usa isso para escolher a pessoa certa ao sugerir tarefas." className={input} />
-            </label>
-            <SaveButton />
-          </form>
-          <div className="mt-3">
-            <ConfirmDelete action={deletePerson.bind(null, person.id)} title={`Excluir ${person.name}?`} label="Excluir pessoa">
-              <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Ela sai das tarefas e das notas; as tarefas ficam." />
-              <DeleteOption name="tasks" value="delete" label="Excluir as tarefas que só ela fazia" hint="Tarefas com outros responsáveis ficam." />
-            </ConfirmDelete>
-          </div>
-        </details>
       </aside>
     </div>
   );

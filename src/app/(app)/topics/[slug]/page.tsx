@@ -6,7 +6,8 @@ import { CoverPicker } from "@/components/CoverPicker";
 import { topicColor } from "@/lib/topicColor";
 import type { NoteListItem } from "@/lib/types";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
-import { deleteTopic } from "@/lib/work-actions";
+import { deleteTopic, saveTopic } from "@/lib/work-actions";
+import { SaveButton } from "@/components/SaveButton";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +58,35 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
         </Link>
         <h1 className="display text-3xl md:text-4xl" >
           <span className="mr-3 inline-block h-3 w-3 rounded-full align-middle" style={{ background: topicColor(topic) }} />
+          {topic.emoji && <span className="mr-2">{topic.emoji}</span>}
           {topic.name}
         </h1>
         {topic.description && <p className="max-w-2xl text-muted">{topic.description}</p>}
         <CoverPicker table="topics" id={topic.id} initialPath={topic.cover_path} />
+        <details className="max-w-xl rounded-lg border border-line bg-panel p-4">
+          <summary className="cursor-pointer font-semibold">Editar tema</summary>
+          <form action={saveTopic.bind(null, topic.id)} className="mt-3 flex flex-col gap-2 text-sm">
+            <div className="flex gap-2">
+              <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+                Emoji
+                <input name="emoji" defaultValue={topic.emoji ?? ""} maxLength={8} placeholder="🏷️" className="rounded-md border border-line bg-panel px-2 py-1.5 text-center text-sm" />
+              </label>
+              <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
+                Nome
+                <input name="name" required defaultValue={topic.name} className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink" />
+              </label>
+              <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+                Cor
+                <input name="color" type="color" defaultValue={topicColor(topic)} className="h-[34px] w-full cursor-pointer rounded-md border border-line bg-panel p-0.5" />
+              </label>
+            </div>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Descrição
+              <textarea name="description" defaultValue={topic.description ?? ""} rows={2} placeholder="Do que este tema trata" className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink" />
+            </label>
+            <SaveButton className="self-start" />
+          </form>
+        </details>
       </header>
 
       {related.length > 0 && (

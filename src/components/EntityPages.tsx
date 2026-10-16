@@ -94,6 +94,31 @@ export async function EntityDetail({ kind, slug }: { kind: EntityKind; slug: str
           {entity.url && /^https?:\/\//.test(entity.url) && (
             <a href={entity.url} target="_blank" rel="noopener noreferrer" className="self-start text-sm text-link underline underline-offset-2">{entity.url}</a>
           )}
+<details className="max-w-xl rounded-lg border border-line bg-panel p-4">
+          <summary className="cursor-pointer font-semibold">Editar</summary>
+          <form action={saveEntity} className="mt-3 flex flex-col gap-2">
+            <input type="hidden" name="id" value={entity.id} />
+            <input type="hidden" name="kind" value={kind} />
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Nome
+              <input name="name" required defaultValue={entity.name} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              {kind === "company" ? "O que é" : "Para que serve"}
+              <textarea name="description" defaultValue={entity.description ?? ""} rows={3} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Site
+              <input name="url" type="url" defaultValue={entity.url ?? ""} placeholder="https://" className={input} />
+            </label>
+            <SaveButton />
+          </form>
+          <div className="mt-3">
+            <ConfirmDelete action={deleteEntity.bind(null, entity.id, kind)} title={`Excluir ${entity.name}?`} label={`Excluir ${t.one.toLowerCase()}`}>
+              <p className="text-muted">As notas e pessoas ligadas continuam; só perdem o vínculo.</p>
+            </ConfirmDelete>
+          </div>
+        </details>
         </header>
 
         <section>
@@ -159,31 +184,6 @@ export async function EntityDetail({ kind, slug }: { kind: EntityKind; slug: str
           Perguntar ao Claude
         </Link>
 
-        <details className="rounded-lg border border-line bg-panel p-4">
-          <summary className="cursor-pointer font-semibold">Editar</summary>
-          <form action={saveEntity} className="mt-3 flex flex-col gap-2">
-            <input type="hidden" name="id" value={entity.id} />
-            <input type="hidden" name="kind" value={kind} />
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Nome
-              <input name="name" required defaultValue={entity.name} className={input} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              {kind === "company" ? "O que é" : "Para que serve"}
-              <textarea name="description" defaultValue={entity.description ?? ""} rows={3} className={input} />
-            </label>
-            <label className="flex flex-col gap-1 text-xs text-muted">
-              Site
-              <input name="url" type="url" defaultValue={entity.url ?? ""} placeholder="https://" className={input} />
-            </label>
-            <SaveButton />
-          </form>
-          <div className="mt-3">
-            <ConfirmDelete action={deleteEntity.bind(null, entity.id, kind)} title={`Excluir ${entity.name}?`} label={`Excluir ${t.one.toLowerCase()}`}>
-              <p className="text-muted">As notas e pessoas ligadas continuam; só perdem o vínculo.</p>
-            </ConfirmDelete>
-          </div>
-        </details>
       </aside>
     </div>
   );
