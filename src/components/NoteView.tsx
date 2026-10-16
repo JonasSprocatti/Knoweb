@@ -390,15 +390,20 @@ export function NoteView({
           </div>
         )}
 
-        <input
+        {/* Título quebra em várias linhas (cresce com o texto); Enter não cria linha nova */}
+        <textarea
           value={title}
+          rows={1}
           onChange={(e) => {
-            setTitle(e.target.value);
+            const v = e.target.value.replace(/\n/g, " ");
+            setTitle(v);
             dirtyRef.current.title = true;
-            save({ title: e.target.value, content });
+            save({ title: v, content });
           }}
+          onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           placeholder="Título"
-          className="w-full bg-transparent text-2xl font-semibold leading-tight tracking-tight text-ink placeholder:text-faint focus:outline-none md:text-3xl"
+          aria-label="Título"
+          className="w-full resize-none overflow-hidden bg-transparent text-2xl font-semibold leading-tight tracking-tight text-ink [field-sizing:content] placeholder:text-faint focus:outline-none md:text-3xl"
         />
 
         <section className="flex flex-col gap-2">
