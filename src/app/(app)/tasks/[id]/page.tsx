@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { addComment, addDependency, deleteComment, deleteTask, logTime, removeDependency, saveTask } from "@/lib/work-actions";
@@ -195,7 +196,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           </fieldset>
           <textarea name="description" defaultValue={task.description} rows={5} placeholder="Detalhes, critérios de pronto, links…" aria-label="Descrição" className={input} />
           <div className="flex items-center justify-between">
-            <button className="rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Salvar</button>
+            <SaveButton />
           </div>
         </form>
 

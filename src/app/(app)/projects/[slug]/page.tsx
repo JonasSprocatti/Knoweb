@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { acceptSuggested, deleteProject, linkNote, saveProject, setProjectStatus, templateFromProject, unlinkNote } from "@/lib/work-actions";
@@ -295,7 +296,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               </label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Início <input type="date" name="start_date" defaultValue={project.start_date ?? ""} className={input} /></label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
-              <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Salvar</button>
+              <SaveButton />
             </form>
             <form action={templateFromProject.bind(null, project.id)} className="mt-3">
               <button className="text-sm text-muted hover:text-ink hover:underline">Salvar como modelo</button>

@@ -1,21 +1,16 @@
 import Link from "next/link";
-import { AutoSelect } from "@/components/AutoSelect";
+import { SaveButton } from "@/components/SaveButton";
+import { StatusPicker } from "@/components/StatusPicker";
+import { TASK_STATUS } from "@/lib/taskStatus";
 import { AssigneePicker } from "@/components/AssigneePicker";
-import { saveTask, setTaskStatus } from "@/lib/work-actions";
+import { saveTask } from "@/lib/work-actions";
 import { topicColor } from "@/lib/topicColor";
 import type { Person, Project, ProjectStatus, Recurrence, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
 
 /** Colunas das listas de tarefas, já com projeto e responsáveis. */
 export const TASK_COLUMNS = "*, projects(id, name, slug, emoji, color), task_assignees(people(id, name, slug))";
 
-export const TASK_STATUS: Record<TaskStatus, { label: string; color: string }> = {
-  suggested: { label: "Sugerida", color: "#8E5B8A" },
-  todo: { label: "A fazer", color: "#8A8073" },
-  doing: { label: "Fazendo", color: "#A8691A" },
-  blocked: { label: "Bloqueada", color: "#D23C32" },
-  done: { label: "Feita", color: "#2F7D73" },
-  canceled: { label: "Cancelada", color: "#C4BBAE" },
-};
+export { TASK_STATUS };
 export const BOARD: TaskStatus[] = ["todo", "doing", "blocked", "done"];
 
 export const PRIORITY: Record<TaskPriority, string> = { urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa" };
@@ -56,9 +51,23 @@ export function cycleDays(t: { started_at: string | null; completed_at: string |
 export const days = (d: number | null) =>
   d == null ? "—" : d < 1 ? "menos de 1 dia" : `${Math.round(d)} ${Math.round(d) === 1 ? "dia" : "dias"}`;
 
+/** Bolinha do status; feita vira um ✓ verde e cancelada um × apagado. */
 export function StatusDot({ status }: { status: TaskStatus }) {
   const s = TASK_STATUS[status];
-  return <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} title={s.label} aria-hidden />;
+  if (status === "done" || status === "canceled")
+    return (
+      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: s.color }} title={s.label} aria-hidden>
+        {status === "done" ? "✓" : "×"}
+      </span>
+    );
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${status === "doing" ? "status-doing" : ""}`}
+      style={{ background: s.color, color: s.color }}
+      title={s.label}
+      aria-hidden
+    />
+  );
 }
 
 export function People({ people }: { people: (Pick<Person, "name" | "slug"> | null)[] }) {
@@ -87,30 +96,15 @@ export function Progress({ done, total, color }: { done: number; total: number; 
   );
 }
 
-/** Muda o status direto na lista. */
+/** Muda o status direto na lista (etiqueta colorida, muda na hora). */
 export function StatusSelect({ id, status }: { id: string; status: TaskStatus }) {
-  return (
-    <form action={setTaskStatus.bind(null, id)}>
-      <AutoSelect
-        name="status"
-        defaultValue={status}
-        aria-label="Status"
-        className="rounded border border-line bg-panel px-1 py-0.5 text-xs text-muted focus:border-accent focus:outline-none"
-      >
-        {Object.entries(TASK_STATUS).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v.label}
-          </option>
-        ))}
-      </AutoSelect>
-    </form>
-  );
+  return <StatusPicker id={id} status={status} />;
 }
 
 export function TaskItem({ task, showProject = true }: { task: TaskRow; showProject?: boolean }) {
   const overdue = task.due_date && isOpen(task.status) && task.due_date < today();
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 last:border-0">
+    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 transition-opacity last:border-0 ${task.status === "done" || task.status === "canceled" ? "opacity-70" : ""}`}>
       <StatusDot status={task.status} />
       <Link href={`/tasks/${task.id}`} className={`min-w-0 flex-1 ${task.status === "done" ? "text-faint line-through" : "text-ink"} hover:underline`}>
         <span className="mr-2 text-xs tabular-nums text-faint">{taskCode(task.number)}</span>
@@ -161,7 +155,7 @@ export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProjec
             </h3>
             <ul className="flex flex-col gap-2">
               {col.map((t) => (
-                <li key={t.id} className="rounded-md border border-line bg-panel p-2.5 text-sm">
+                <li key={t.id} className="rounded-md border border-line border-l-[3px] bg-panel p-2.5 text-sm" style={{ borderLeftColor: TASK_STATUS[t.status].color }}>
                   <Link href={`/tasks/${t.id}`} className="block text-ink hover:underline">
                     <span className="mr-1.5 text-xs text-faint">{taskCode(t.number)}</span>
                     {t.title}
@@ -269,7 +263,7 @@ export function QuickTask({
           </option>
         ))}
       </select>
-      <button className="press ml-auto rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Criar</button>
+      <SaveButton className="ml-auto">Criar</SaveButton>
     </form>
   );
 }

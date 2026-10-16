@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { completeSprint, deleteSprint, moveToSprint, saveSprint } from "@/lib/work-actions";
@@ -84,7 +85,7 @@ export default async function SprintPage({ params }: { params: Promise<{ id: str
             <input name="goal" defaultValue={sprint.goal ?? ""} placeholder="Objetivo" aria-label="Objetivo" className={input} />
             <input type="date" name="start_date" required defaultValue={sprint.start_date} aria-label="Início" className={input} />
             <input type="date" name="end_date" required defaultValue={sprint.end_date} aria-label="Fim" className={input} />
-            <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent">Salvar</button>
+            <SaveButton />
           </form>
           <div className="mt-3">
             <ConfirmDelete action={deleteSprint.bind(null, sprint.id)} title={`Excluir ${sprint.name}?`} label="Excluir sprint">

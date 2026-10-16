@@ -145,6 +145,34 @@ dialog[open]::backdrop {
   }
 }
 
+/* Confirmação: o ✓ "salta" ao aparecer */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+.pop {
+  animation: pop 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Tarefa em andamento: a bolinha pulsa de leve */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+}
+.status-doing {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
 /* Esqueleto de carregamento */
 @keyframes shimmer {
   50% {

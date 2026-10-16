@@ -300,9 +300,18 @@ export function NoteView({
           <StatusBadge status={note.status} />
           <span className="ml-auto flex items-center gap-1">
             <span className="mr-2">
-              {saveState === "saving" && "salvando…"}
-              {saveState === "saved" && "salvo"}
-              {saveState === "error" && <span className="text-rec">erro ao salvar</span>}
+              {saveState === "saving" && (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+                  salvando…
+                </span>
+              )}
+              {saveState === "saved" && (
+                <span key={note.updated_at ?? "s"} className="pop inline-flex items-center gap-1 rounded-full bg-[#2F9D6B]/15 px-2 py-0.5 font-medium text-[#2F9D6B]" role="status">
+                  ✓ salvo
+                </span>
+              )}
+              {saveState === "error" && <span className="font-medium text-rec">⚠ erro ao salvar, tentando de novo ao editar</span>}
             </span>
             <IconButton title={note.pinned ? "Desafixar" : "Fixar"} onClick={togglePin} active={note.pinned} icon="pin" />
             <button

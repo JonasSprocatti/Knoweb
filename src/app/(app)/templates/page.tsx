@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteTemplate, saveTemplate } from "@/lib/work-actions";
 import { hours, RECURRENCE } from "@/components/Work";
@@ -24,7 +25,7 @@ function TemplateForm({ t }: { t?: Template }) {
       </div>
       <input name="description" defaultValue={t?.description ?? ""} placeholder="Objetivo padrão do projeto" aria-label="Descrição" className={input} />
       <textarea name="tasks" defaultValue={t ? toText(t) : ""} rows={6} placeholder={HELP} aria-label="Tarefas do modelo" className={`${input} font-mono`} />
-      <button className="self-start rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">{t ? "Salvar" : "Criar modelo"}</button>
+      <SaveButton className="self-start">{t ? "Salvar" : "Criar modelo"}</SaveButton>
     </form>
   );
 }

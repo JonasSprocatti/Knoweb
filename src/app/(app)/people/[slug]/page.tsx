@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deletePerson, savePerson, setMe } from "@/lib/work-actions";
@@ -192,7 +193,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
               O que faz
               <textarea name="about" defaultValue={person.about ?? ""} rows={4} placeholder="Do que cuida, em que é bom, que sistemas usa. O Claude usa isso para escolher a pessoa certa ao sugerir tarefas." className={input} />
             </label>
-            <button className="rounded-md bg-accent px-3 py-1.5 font-semibold text-on-accent hover:brightness-110">Salvar</button>
+            <SaveButton />
           </form>
           <div className="mt-3">
             <ConfirmDelete action={deletePerson.bind(null, person.id)} title={`Excluir ${person.name}?`} label="Excluir pessoa">
