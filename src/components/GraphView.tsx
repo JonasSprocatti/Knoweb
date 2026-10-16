@@ -12,7 +12,20 @@ const GraphCanvas3D = dynamic(() => import("@/components/GraphCanvas3D"), { ssr:
 
 const idOf = (end: string | SimNode) => (typeof end === "string" ? end : end.id);
 const isHub = (n: SimNode) => n.type === "topic" || n.type === "project";
-const WORK = new Set<GraphNode["type"]>(["project", "task", "person", "sprint"]);
+type NodeType = GraphNode["type"];
+const TYPES: { type: NodeType; label: string }[] = [
+  { type: "note", label: "Notas" },
+  { type: "recording", label: "Gravações" },
+  { type: "topic", label: "Temas" },
+  { type: "project", label: "Projetos" },
+  { type: "task", label: "Tarefas" },
+  { type: "person", label: "Pessoas" },
+  { type: "sprint", label: "Sprints" },
+];
+const ALL_TYPES = TYPES.map((t) => t.type);
+// Ao focar num projeto, a busca segue por tarefas e notas, mas não atravessa temas, pessoas e sprints
+// (eles ligam tudo a tudo e trariam a teia inteira de volta)
+const PASS_THROUGH = new Set<NodeType>(["task", "note", "recording"]);
 const radius = (n: SimNode) => (isHub(n) ? 4.5 + Math.sqrt(n.weight) * 1.7 : 2.6 + Math.sqrt(n.weight)) * (n.image ? 1.5 : 1);
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" });
@@ -50,9 +63,10 @@ export function GraphView() {
   const [themeId, setThemeId] = usePref<ThemeId>("teia:visual", "executivo");
   const [threeD, setThreeD] = usePref("teia:3d", false);
   const [clouds, setClouds] = usePref("teia:nuvens", false);
-  const [showTopics, setShowTopics] = useState(true);
+  const [types, setTypes] = usePref<NodeType[]>("teia:tipos", ALL_TYPES);
+  const [focus, setFocus] = useState(""); // id do projeto em foco ("p:…") ou "" para tudo
+  const [panel, setPanel] = useState(false);
   const [showAi, setShowAi] = useState(true);
-  const [showWork, setShowWork] = usePref("teia:trabalho", true);
   const [hideOrphans, setHideOrphans] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const [find, setFind] = useState("");
@@ -118,13 +132,36 @@ export function GraphView() {
   const data = useMemo(() => {
     if (!raw) return { nodes: [] as SimNode[], links: [] as SimLink[] };
     const cutoff = step == null ? null : times[step];
+    const shown = new Set(types);
+    // Projeto em foco: ele, as tarefas e notas dele e o que está ligado a elas (2 passos)
+    let around: Set<string> | null = null;
+    if (focus) {
+      const typeOf = new Map(raw.nodes.map((n) => [n.id, n.type]));
+      const adj = new Map<string, string[]>();
+      for (const l of raw.links) {
+        adj.set(l.source, [...(adj.get(l.source) ?? []), l.target]);
+        adj.set(l.target, [...(adj.get(l.target) ?? []), l.source]);
+      }
+      around = new Set([focus]);
+      let frontier = [focus];
+      for (let depth = 0; depth < 2; depth++) {
+        const next: string[] = [];
+        for (const id of frontier) {
+          if (id !== focus && !PASS_THROUGH.has(typeOf.get(id)!)) continue;
+          for (const nb of adj.get(id) ?? []) {
+            if (typeOf.get(nb) === "project" || around.has(nb)) continue;
+            around.add(nb);
+            next.push(nb);
+          }
+        }
+        frontier = next;
+      }
+    }
     let nodes = raw.nodes.filter(
-      (n) => (showTopics || n.type !== "topic") && (showWork || !WORK.has(n.type)) && (!cutoff || n.created_at <= cutoff),
+      (n) => (shown.has(n.type) || n.id === focus) && (!around || around.has(n.id)) && (!cutoff || n.created_at <= cutoff),
     );
     const ids = new Set(nodes.map((n) => n.id));
-    const links = raw.links.filter(
-      (l) => (showTopics || l.kind !== "topic") && (showAi || l.kind !== "ai") && ids.has(l.source) && ids.has(l.target),
-    );
+    const links = raw.links.filter((l) => (showAi || l.kind !== "ai") && ids.has(l.source) && ids.has(l.target));
     if (hideOrphans) {
       const connected = new Set(links.flatMap((l) => [l.source, l.target]));
       nodes = nodes.filter((n) => connected.has(n.id));
@@ -141,7 +178,19 @@ export function GraphView() {
       }),
       links: links.map((l) => ({ ...l })) as SimLink[],
     };
-  }, [raw, showTopics, showAi, showWork, hideOrphans, step, times]);
+  }, [raw, types, focus, showAi, hideOrphans, step, times]);
+
+  const projects = useMemo(
+    () => (raw?.nodes ?? []).filter((n) => n.type === "project").sort((a, b) => a.label.localeCompare(b.label)),
+    [raw],
+  );
+  // Ao trocar o foco, enquadra o que sobrou depois que a simulação assentar
+  useEffect(() => {
+    const t = setTimeout(() => fgRef.current?.zoomToFit?.(600, 60), 900);
+    return () => clearTimeout(t);
+  }, [focus, types]);
+  const toggleType = (t: NodeType) => setTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t]);
+  const filtered = types.length < ALL_TYPES.length || !!focus || hideOrphans || !showAi;
 
   const neighbors = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -189,44 +238,89 @@ export function GraphView() {
 
   return (
     <div className="-mx-4 -mb-28 -mt-5 flex h-[calc(100dvh-7.5rem)] flex-col md:-mx-8 md:-mb-10 md:-mt-8 md:h-dvh">
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-line bg-surface px-4 py-2 text-sm [scrollbar-width:none] md:px-6">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            focusOn(find);
-          }}
-          className="shrink-0"
-        >
-          <input
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-            placeholder="Achar um ponto"
-            aria-label="Achar um ponto na teia"
-            className="w-36 rounded-md border border-line bg-panel px-3 py-1.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none sm:w-48"
-          />
-        </form>
-
-        <div role="radiogroup" aria-label="Visual da teia" className="flex shrink-0 gap-0.5 rounded-md border border-line bg-panel p-0.5">
-          {THEME_LIST.map((t) => (
-            <button
-              key={t.id}
-              role="radio"
-              aria-checked={themeId === t.id}
-              onClick={() => setThemeId(t.id)}
-              className={`rounded px-2.5 py-1 transition ${themeId === t.id ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
-            >
-              {t.name}
-            </button>
-          ))}
+      <div className="relative z-10 border-b border-line bg-surface text-sm">
+        <div className="flex items-center gap-2 px-4 py-2 md:px-6">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              focusOn(find);
+            }}
+            className="min-w-0 flex-1 sm:max-w-56 sm:flex-none"
+          >
+            <input
+              value={find}
+              onChange={(e) => setFind(e.target.value)}
+              placeholder="Achar um ponto"
+              aria-label="Achar um ponto na teia"
+              className="w-full rounded-md border border-line bg-panel px-3 py-1.5 text-ink placeholder:text-faint focus:border-accent focus:outline-none"
+            />
+          </form>
+          <select
+            value={focus}
+            onChange={(e) => setFocus(e.target.value)}
+            aria-label="Mostrar só um projeto"
+            className={`min-w-0 max-w-[45%] rounded-md border px-2 py-1.5 sm:max-w-64 ${focus ? "border-accent bg-accent/10 text-accent" : "border-line bg-panel text-ink"}`}
+          >
+            <option value="">Todos os projetos</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.emoji ? `${p.emoji} ` : ""}
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setPanel(!panel)}
+            aria-expanded={panel}
+            className={`press relative shrink-0 rounded-md border px-3 py-1.5 ${panel ? "border-accent bg-accent/10 text-accent" : "border-line text-muted hover:text-ink"}`}
+          >
+            Filtros
+            {filtered && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-surface" aria-label="(com filtro)" />}
+          </button>
         </div>
 
-        <span className="h-5 w-px shrink-0 bg-line" aria-hidden />
-        <Toggle on={threeD} set={setThreeD} label="3D" />
-        <Toggle on={clouds} set={setClouds} label="Nuvens" />
-        <Toggle on={showTopics} set={setShowTopics} label="Temas" />
-        <Toggle on={showAi} set={setShowAi} label="Ligações do Claude" />
-        <Toggle on={showWork} set={setShowWork} label="Projetos e tarefas" />
-        <Toggle on={hideOrphans} set={setHideOrphans} label="Esconder soltos" />
+        {panel && (
+          <div className="absolute inset-x-0 top-full flex flex-col gap-3 border-b border-line bg-surface px-4 py-3 shadow-lg md:px-6">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-faint">Mostrar</span>
+              {TYPES.map((t) => (
+                <Toggle key={t.type} on={types.includes(t.type)} set={() => toggleType(t.type)} label={t.label} />
+              ))}
+              <button onClick={() => setTypes(ALL_TYPES)} className="ml-1 text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
+                tudo
+              </button>
+              <button onClick={() => setTypes(["project", "task"])} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
+                só trabalho
+              </button>
+              <button onClick={() => setTypes(["note", "recording", "topic"])} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
+                só conhecimento
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-faint">Visual</span>
+              <div role="radiogroup" aria-label="Visual da teia" className="flex flex-wrap gap-0.5 rounded-md border border-line bg-panel p-0.5">
+                {THEME_LIST.map((t) => (
+                  <button
+                    key={t.id}
+                    role="radio"
+                    aria-checked={themeId === t.id}
+                    onClick={() => setThemeId(t.id)}
+                    className={`rounded px-2.5 py-1 transition ${themeId === t.id ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
+                  >
+                    {t.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-faint">Opções</span>
+              <Toggle on={showAi} set={setShowAi} label="Ligações do Claude" />
+              <Toggle on={hideOrphans} set={setHideOrphans} label="Esconder soltos" />
+              <Toggle on={clouds} set={setClouds} label="Nuvens" />
+              <Toggle on={threeD} set={setThreeD} label="3D" />
+            </div>
+          </div>
+        )}
       </div>
 
       <div ref={wrapRef} className="relative min-h-0 flex-1" style={{ background: theme.bg }}>
@@ -234,6 +328,12 @@ export function GraphView() {
         {raw && raw.nodes.length === 0 && (
           <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-muted">
             Grave uma conversa ou escreva uma nota. Cada uma vira um ponto aqui, ligado aos temas que o Claude encontrar.
+          </p>
+        )}
+
+        {raw && raw.nodes.length > 0 && data.nodes.length === 0 && (
+          <p className="absolute inset-0 z-[1] flex items-center justify-center p-6 text-center text-muted">
+            Nada aparece com esses filtros. Abra <b className="mx-1 text-ink">Filtros</b> e marque mais tipos, ou volte para todos os projetos.
           </p>
         )}
 
