@@ -8,6 +8,8 @@ const PATHS: Record<string, string> = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm9 3-4.3-4.3",
   plus: "M12 5v14M5 12h14",
   more: "M4 6h16M4 12h16M4 18h16",
+  building: "M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3",
+  server: "M4 4h16v6H4zM4 14h16v6H4zM8 7h.01M8 17h.01",
   sparkle: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7z",
   trash: "M4 7h16M10 11v6m4-6v6M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M9 7V4h6v3",
   pin: "M9 4h6l-1 6 4 4H6l4-4zM12 14v7",

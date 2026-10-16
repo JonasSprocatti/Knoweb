@@ -15,6 +15,8 @@ const NAV = [
   { href: "/sprints", label: "Sprints", icon: "sprint" },
   { href: "/people", label: "Pessoas", icon: "user" },
   { href: "/topics", label: "Temas", icon: "tag" },
+  { href: "/companies", label: "Empresas", icon: "building" },
+  { href: "/systems", label: "Sistemas", icon: "server" },
   { href: "/graph", label: "Teia", icon: "graph" },
   { href: "/ask", label: "Perguntar", icon: "ask" },
 ];

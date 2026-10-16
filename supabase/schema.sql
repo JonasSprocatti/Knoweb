@@ -563,3 +563,41 @@ create policy "files_own_delete" on storage.objects for delete
 -- ---------------------------------------------------------------------
 alter table public.people add column if not exists is_me boolean not null default false;
 create unique index if not exists people_one_me on public.people (user_id) where is_me;
+
+-- ---------------------------------------------------------------------
+-- Empresas e sistemas (clientes, fornecedores, SAP, Senior…): citados nas
+-- notas, ligados às pessoas (empresa de cada uma) e pontos na teia.
+-- ---------------------------------------------------------------------
+create table if not exists public.entities (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind          text not null check (kind in ('company', 'system')),
+  name          text not null,
+  slug          text not null,
+  description   text,
+  url           text,
+  created_at    timestamptz not null default now(),
+  unique (user_id, kind, slug)
+);
+
+create table if not exists public.note_entities (
+  note_id       uuid not null references public.notes(id) on delete cascade,
+  entity_id     uuid not null references public.entities(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  source        text not null default 'ai' check (source in ('ai', 'manual')),
+  primary key (note_id, entity_id)
+);
+create index if not exists note_entities_entity_idx on public.note_entities (entity_id);
+
+alter table public.people add column if not exists company_id uuid references public.entities(id) on delete set null;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['entities', 'note_entities'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own_rows" on public.%I', t);
+    execute format(
+      'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+  end loop;
+end $$;

@@ -3,7 +3,7 @@ import { SaveButton } from "@/components/SaveButton";
 import { StatusPicker } from "@/components/StatusPicker";
 import { TASK_STATUS } from "@/lib/taskStatus";
 import { AssigneePicker } from "@/components/AssigneePicker";
-import { saveTask } from "@/lib/work-actions";
+import { deleteTask, saveTask, setTaskStatus } from "@/lib/work-actions";
 import { topicColor } from "@/lib/topicColor";
 import type { Person, Project, ProjectStatus, Recurrence, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
 
@@ -126,7 +126,23 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
         <span className="text-xs font-semibold text-rec">{PRIORITY[task.priority]}</span>
       )}
       {task.due_date && <span className={`text-xs tabular-nums ${overdue ? "font-semibold text-rec" : "text-faint"}`}>{formatDay(task.due_date)}</span>}
-      <StatusSelect id={task.id} status={task.status} />
+      {task.status === "suggested" ? (
+        // Sugestão do Claude: aceita ou descarta uma a uma, antes de "aceitar todas"
+        <span className="flex items-center gap-1">
+          <form action={setTaskStatus.bind(null, task.id, "todo")}>
+            <button className="press rounded-full border border-[#2F9D6B]/50 bg-[#2F9D6B]/10 px-2.5 py-0.5 text-xs font-medium text-[#2F9D6B]" title="Aceitar esta tarefa">
+              ✓ Aceitar
+            </button>
+          </form>
+          <form action={deleteTask.bind(null, task.id, null)}>
+            <button className="press rounded-full border border-line px-2.5 py-0.5 text-xs text-muted hover:border-rec hover:text-rec" title="Descartar esta sugestão">
+              × Descartar
+            </button>
+          </form>
+        </span>
+      ) : (
+        <StatusSelect id={task.id} status={task.status} />
+      )}
     </li>
   );
 }

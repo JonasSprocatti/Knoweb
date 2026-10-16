@@ -11,7 +11,7 @@ const GraphCanvas = dynamic(() => import("@/components/GraphCanvas"), { ssr: fal
 const GraphCanvas3D = dynamic(() => import("@/components/GraphCanvas3D"), { ssr: false });
 
 const idOf = (end: string | SimNode) => (typeof end === "string" ? end : end.id);
-const isHub = (n: SimNode) => n.type === "topic" || n.type === "project";
+const isHub = (n: SimNode) => n.type === "topic" || n.type === "project" || n.type === "company" || n.type === "system";
 type NodeType = GraphNode["type"];
 const TYPES: { type: NodeType; label: string }[] = [
   { type: "note", label: "Notas" },
@@ -21,6 +21,8 @@ const TYPES: { type: NodeType; label: string }[] = [
   { type: "task", label: "Tarefas" },
   { type: "person", label: "Pessoas" },
   { type: "sprint", label: "Sprints" },
+  { type: "company", label: "Empresas" },
+  { type: "system", label: "Sistemas" },
 ];
 const ALL_TYPES = TYPES.map((t) => t.type);
 // Ao focar num projeto, a busca segue por tarefas e notas, mas não atravessa temas, pessoas e sprints
@@ -231,6 +233,8 @@ export function GraphView() {
     else if (n.type === "person") router.push(`/people/${n.slug}`);
     else if (n.type === "task") router.push(`/tasks/${taskId}`);
     else if (n.type === "sprint") router.push(`/sprints/${taskId}`);
+    else if (n.type === "company") router.push(`/companies/${n.slug}`);
+    else if (n.type === "system") router.push(`/systems/${n.slug}`);
     else router.push(`/notes/${n.id}`);
   };
   const tooltip = (n: SimNode) => escapeHtml(n.emoji ? `${n.emoji} ${n.label}` : n.label);

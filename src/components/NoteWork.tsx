@@ -1,34 +1,38 @@
 import Link from "next/link";
-import { acceptSuggested, deleteProject, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
+import { unlinkEntity, acceptSuggested, deleteProject, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PendingCreations } from "@/lib/types";
+import type { EntityKind, PendingCreations } from "@/lib/types";
+import { ENTITY } from "@/lib/entities";
+import { Icon } from "@/components/Icon";
 
 type P = { id: string; name: string; slug: string; emoji: string | null; color: string | null; status: string; reason: string | null };
 
 /** Painel da nota: projetos, tarefas e pessoas que saíram dela. */
 export async function NoteWork({ supabase, noteId, pending }: { supabase: SupabaseClient; noteId: string; pending?: PendingCreations }) {
-  const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }] = await Promise.all([
+  const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }, { data: entRows }] = await Promise.all([
     supabase.from("project_notes").select("projects(id, name, slug, emoji, color, status, reason)").eq("note_id", noteId),
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
     supabase.from("note_people").select("people(id, name, slug)").eq("note_id", noteId),
     supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
+    supabase.from("note_entities").select("entities(id, kind, name, slug)").eq("note_id", noteId),
   ]);
   const linked = (pn ?? []).map((r) => one(r.projects as unknown as P | null)).filter((p): p is P => !!p);
   const tasks = normalizeTasks(taskRows);
   const mentioned = (np ?? []).map((r) => one(r.people as unknown as { id: string; name: string; slug: string } | null)).filter((p) => !!p);
+  const ents = (entRows ?? []).map((r) => one(r.entities as unknown as { id: string; kind: EntityKind; name: string; slug: string } | null)).filter((e) => !!e) as { id: string; kind: EntityKind; name: string; slug: string }[];
   const suggestedCount = tasks.filter((t) => t.status === "suggested").length;
 
   const suggestedProjects = linked.filter((p) => p.status === "suggested").length;
-  const hasPending = !!pending && pending.topics.length + pending.people.length > 0;
+  const hasPending = !!pending && pending.topics.length + pending.people.length + (pending.entities?.length ?? 0) > 0;
 
   return (
     <>
       {(hasPending || suggestedProjects > 0 || suggestedCount > 0) && (
         <section id="criar" className="scroll-mt-20 rounded-md border border-dashed border-accent/60 p-3">
           <h2 className="mb-1 text-base font-semibold">O Claude quer criar</h2>
-          <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Marque o que quer criar.</p>
+          <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Desmarque o que não quer; tarefas e projetos você aceita ou descarta um a um abaixo.</p>
           {hasPending && (
             <form action={resolvePending.bind(null, noteId)} className="flex flex-col gap-2 text-sm">
               {pending!.topics.length > 0 && (
@@ -45,6 +49,24 @@ export async function NoteWork({ supabase, noteId, pending }: { supabase: Supaba
                   ))}
                 </fieldset>
               )}
+              {(["company", "system"] as const).map((kind) => {
+                const list = (pending!.entities ?? []).filter((e) => e.kind === kind);
+                if (!list.length) return null;
+                return (
+                  <fieldset key={kind} className="flex flex-col gap-1">
+                    <legend className="mb-1 text-xs font-medium text-muted">{kind === "company" ? "Empresas novas" : "Sistemas novos"}</legend>
+                    {list.map((e) => (
+                      <label key={e.slug} className="flex cursor-pointer items-start gap-2">
+                        <input type="checkbox" name="entity" value={`${e.kind}:${e.slug}`} defaultChecked className="mt-1 accent-accent" />
+                        <span>
+                          {e.name}
+                          {e.description && <span className="block text-xs text-faint">{e.description}</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </fieldset>
+                );
+              })}
               {pending!.people.length > 0 && (
                 <fieldset className="flex flex-col gap-1">
                   <legend className="mb-1 text-xs font-medium text-muted">Pessoas novas</legend>
@@ -130,6 +152,23 @@ export async function NoteWork({ supabase, noteId, pending }: { supabase: Supaba
           </div>
         </details>
       </section>
+
+      {ents.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-base font-semibold">Empresas e sistemas</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {ents.map((e) => (
+              <span key={e.id} className="inline-flex items-center gap-1 rounded-md border py-0.5 pl-2 pr-1 text-sm" style={{ borderColor: `${ENTITY[e.kind].color}66` }}>
+                <span style={{ color: ENTITY[e.kind].color }}><Icon name={ENTITY[e.kind].icon} className="h-3.5 w-3.5" /></span>
+                <Link href={`${ENTITY[e.kind].path}/${e.slug}`} className="text-ink hover:underline">{e.name}</Link>
+                <form action={unlinkEntity.bind(null, noteId, e.id)}>
+                  <button className="px-1 text-faint hover:text-ink" aria-label={`Tirar ${e.name} desta nota`} title="Tirar desta nota">×</button>
+                </form>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
 
       {mentioned.length > 0 && (
         <section>

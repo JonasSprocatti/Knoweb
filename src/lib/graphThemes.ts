@@ -299,6 +299,13 @@ function executivo(dark: boolean): GraphTheme {
         ctx.lineTo(x, y + r * 1.25);
         ctx.lineTo(x - r * 1.25, y);
         ctx.closePath();
+      } else if (n.type === "company" || n.type === "system") {
+        // Empresa hexágono, sistema retângulo
+        ctx.beginPath();
+        if (n.type === "company")
+          for (let i = 0; i < 6; i++) ctx.lineTo(x + r * 1.15 * Math.cos((Math.PI / 3) * i), y + r * 1.15 * Math.sin((Math.PI / 3) * i));
+        else ctx.roundRect(x - r * 1.2, y - r * 0.75, r * 2.4, r * 1.5, r * 0.25);
+        ctx.closePath();
       } else circle(ctx, x, y, r);
       const hollow = n.type === "recording" || n.type === "person";
       ctx.fillStyle = hollow ? ring : n.color;

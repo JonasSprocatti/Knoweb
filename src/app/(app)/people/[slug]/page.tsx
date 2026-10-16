@@ -18,7 +18,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
   const { data: person } = await supabase.from("people").select("*").eq("slug", slug).maybeSingle();
   if (!person) notFound();
 
-  const [{ data: taskRows }, { data: mentions }, { data: owned }] = await Promise.all([
+  const [{ data: taskRows }, { data: mentions }, { data: owned }, { data: companies }] = await Promise.all([
     supabase
       .from("tasks")
       .select(TASK_COLUMNS.replace("task_assignees(", "mine:task_assignees!inner(person_id), task_assignees("))
@@ -26,7 +26,9 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
       .order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("note_people").select("notes(id, title, summary, created_at)").eq("person_id", person.id),
     supabase.from("projects").select("id, name, slug, emoji, color, status").eq("owner_id", person.id),
+    supabase.from("entities").select("id, name, slug").eq("kind", "company").order("name"),
   ]);
+  const company = (companies ?? []).find((c) => c.id === person.company_id);
 
   const tasks = normalizeTasks(taskRows as unknown[] | null).filter((t) => t.status !== "canceled");
   const real = tasks.filter((t) => t.status !== "suggested");
@@ -76,6 +78,11 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             </form>
           </div>
           {(person.role || person.email) && <p className="text-muted">{[person.role, person.email].filter(Boolean).join(" · ")}</p>}
+          {company && (
+            <Link href={`/companies/${company.slug}`} className="self-start text-sm text-muted underline-offset-2 hover:text-ink hover:underline">
+              🏢 {company.name}
+            </Link>
+          )}
           {person.about && <p className="max-w-2xl text-muted">{person.about}</p>}
         </header>
 
@@ -184,6 +191,15 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             <label className="flex flex-col gap-1 text-xs text-muted">
               Cargo / papel
               <input name="role" defaultValue={person.role ?? ""} placeholder="Ex.: analista de RH, cliente, designer" className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Empresa
+              <select name="company_id" defaultValue={person.company_id ?? ""} className={input}>
+                <option value="">Nenhuma</option>
+                {(companies ?? []).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
             </label>
             <label className="flex flex-col gap-1 text-xs text-muted">
               E-mail

@@ -271,6 +271,7 @@ export async function savePerson(form: FormData) {
     role: str(form, "role"),
     email: str(form, "email"),
     about: str(form, "about"),
+    ...(form.has("company_id") ? { company_id: str(form, "company_id") } : {}),
   };
   const saved = id
     ? must(await supabase.from("people").update(row).eq("id", id).select("id, slug").single())
@@ -497,6 +498,19 @@ export async function resolvePending(noteId: string, form: FormData) {
   const discard = form.has("discard");
   const topics = discard ? [] : pending.topics.filter((t) => form.getAll("topic").includes(t.slug));
   const people = discard ? [] : pending.people.filter((p) => form.getAll("person").includes(p.slug));
+  const ents = discard ? [] : (pending.entities ?? []).filter((e) => form.getAll("entity").includes(`${e.kind}:${e.slug}`));
+
+  if (ents.length) {
+    must(await supabase.from("entities").upsert(
+      ents.map((e) => ({ kind: e.kind, name: e.name, slug: e.slug, description: e.description || null })),
+      { onConflict: "user_id,kind,slug", ignoreDuplicates: true },
+    ));
+    const { data: rows } = await supabase.from("entities").select("id, kind, slug").in("slug", ents.map((e) => e.slug));
+    const links = (rows ?? [])
+      .filter((r) => ents.some((e) => e.kind === r.kind && e.slug === r.slug))
+      .map((r) => ({ note_id: noteId, entity_id: r.id as string, source: "ai" }));
+    if (links.length) await supabase.from("note_entities").upsert(links, { ignoreDuplicates: true });
+  }
 
   if (topics.length) {
     must(await supabase.from("topics").upsert(
@@ -534,5 +548,35 @@ export async function resolvePending(noteId: string, form: FormData) {
 export async function removeMention(noteId: string, personId: string) {
   const supabase = await db();
   must(await supabase.from("note_people").delete().eq("note_id", noteId).eq("person_id", personId));
+  refresh();
+}
+
+// ---------------------------------------------------------------- Empresas e sistemas
+
+export async function saveEntity(form: FormData) {
+  const supabase = await db();
+  const id = str(form, "id");
+  const kind = str(form, "kind") === "system" ? "system" : "company";
+  const name = str(form, "name");
+  if (!name) throw new Error("Escreva o nome.");
+  const row = { kind, name, slug: slugify(name) || "sem-nome", description: str(form, "description"), url: str(form, "url") };
+  const saved = id
+    ? must(await supabase.from("entities").update(row).eq("id", id).select("slug").single())
+    : must(await supabase.from("entities").upsert(row, { onConflict: "user_id,kind,slug" }).select("slug").single());
+  refresh();
+  redirect(`${kind === "system" ? "/systems" : "/companies"}/${saved.slug}`);
+}
+
+/** Exclui a empresa ou sistema; as notas e pessoas ligadas ficam (só perdem o vínculo). */
+export async function deleteEntity(id: string, kind: string, _form?: FormData) {
+  const supabase = await db();
+  must(await supabase.from("entities").delete().eq("id", id));
+  refresh();
+  redirect(kind === "system" ? "/systems" : "/companies");
+}
+
+export async function unlinkEntity(noteId: string, entityId: string) {
+  const supabase = await db();
+  must(await supabase.from("note_entities").delete().eq("note_id", noteId).eq("entity_id", entityId));
   refresh();
 }

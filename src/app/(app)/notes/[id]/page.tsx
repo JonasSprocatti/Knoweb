@@ -38,7 +38,7 @@ export default async function NotePage({
     supabase.from("project_notes").select("projects!inner(status)", { count: "exact", head: true }).eq("note_id", id).eq("projects.status", "suggested"),
   ]);
   const pending = (note as Note).insights?.pending;
-  const toReview = (pending?.topics.length ?? 0) + (pending?.people.length ?? 0) + (sugTasks ?? 0) + (sugProjects ?? 0);
+  const toReview = (pending?.topics.length ?? 0) + (pending?.people.length ?? 0) + (pending?.entities?.length ?? 0) + (sugTasks ?? 0) + (sugProjects ?? 0);
 
   type Joined = { id: string; title: string } | { id: string; title: string }[] | null;
   const one = (j: Joined) => (Array.isArray(j) ? j[0] : j);

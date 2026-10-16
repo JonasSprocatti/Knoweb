@@ -26,6 +26,8 @@ interface AnalysisResult {
   topics: { name: string; description: string; relevance: number; emoji?: string }[];
   related_notes: { id: string; reason: string }[];
   projects?: { name: string; is_new: boolean; description?: string; emoji?: string; reason?: string; relevance?: number }[];
+  companies?: { name: string; description?: string }[];
+  systems?: { name: string; description?: string }[];
 }
 
 const ANALYSIS_TOOL: Anthropic.Tool = {
@@ -102,6 +104,16 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
           required: ["name", "is_new"],
         },
       },
+      companies: {
+        type: "array",
+        description: "Empresas citadas (clientes, fornecedores, parceiros). Use o nome exato de uma empresa existente quando for ela.",
+        items: { type: "object", properties: { name: { type: "string" }, description: { type: "string", description: "Uma frase sobre a empresa (só se nova)." } }, required: ["name"] },
+      },
+      systems: {
+        type: "array",
+        description: "Sistemas e ferramentas de trabalho citados (ex.: SAP, Senior, Salesforce, Teams). Use o nome exato de um existente quando for ele. Não inclua linguagens de programação nem termos genéricos.",
+        items: { type: "object", properties: { name: { type: "string" }, description: { type: "string", description: "Para que serve (só se novo)." } }, required: ["name"] },
+      },
       related_notes: {
         type: "array",
         description: "Notas existentes que têm relação real com esta (até 6). Use só ids da lista fornecida.",
@@ -155,7 +167,7 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
   await supabase.from("notes").update({ status: "analyzing" }).eq("id", noteId);
 
   try {
-    const [{ data: topics }, { data: others }, { data: projects }, { data: people }, { data: history }, { data: home }] = await Promise.all([
+    const [{ data: topics }, { data: others }, { data: projects }, { data: people }, { data: history }, { data: home }, { data: entities }] = await Promise.all([
       supabase.from("topics").select("name, description").order("name").limit(400),
       supabase
         .from("notes")
@@ -172,6 +184,7 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
         .order("updated_at", { ascending: false })
         .limit(400),
       supabase.from("project_notes").select("project_id, projects(name)").eq("note_id", noteId).eq("source", "manual"),
+      supabase.from("entities").select("id, kind, name, slug").order("name").limit(600),
     ]);
 
     const topicList = (topics ?? []).map((t) => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n");
@@ -225,6 +238,14 @@ ${projectList || "(nenhum ainda)"}
 <pessoas_existentes>
 ${peopleList || "(nenhuma ainda)"}
 </pessoas_existentes>
+
+<empresas_existentes>
+${(entities ?? []).filter((e) => e.kind === "company").map((e) => `- ${e.name}`).join("\n") || "(nenhuma ainda)"}
+</empresas_existentes>
+
+<sistemas_existentes>
+${(entities ?? []).filter((e) => e.kind === "system").map((e) => `- ${e.name}`).join("\n") || "(nenhum ainda)"}
+</sistemas_existentes>
 
 <outras_notas>
 ${noteList || "(nenhuma ainda)"}
@@ -307,6 +328,25 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       await supabase.from("note_links").upsert(linkRows, { onConflict: "source_id,target_id,kind" });
     }
 
+    // ---- Empresas e sistemas: os que existem ligam já; os novos esperam você confirmar
+    const known = new Map((entities ?? []).map((e) => [`${e.kind}:${e.slug}`, e.id as string]));
+    const seen = new Set<string>();
+    const entityLinks: { note_id: string; entity_id: string; source: "ai" }[] = [];
+    pending.entities = [];
+    for (const [kind, list] of [["company", result.companies], ["system", result.systems]] as const) {
+      for (const item of list ?? []) {
+        const name = item.name?.trim();
+        const slug = name ? slugify(name) : "";
+        if (!slug || seen.has(`${kind}:${slug}`)) continue;
+        seen.add(`${kind}:${slug}`);
+        const id = known.get(`${kind}:${slug}`);
+        if (id) entityLinks.push({ note_id: noteId, entity_id: id, source: "ai" });
+        else pending.entities.push({ kind, name, slug, description: item.description ?? "" });
+      }
+    }
+    await supabase.from("note_entities").delete().eq("note_id", noteId).eq("source", "ai");
+    if (entityLinks.length) await supabase.from("note_entities").upsert(entityLinks, { ignoreDuplicates: true });
+
     pending.people = await linkWork(supabase, noteId, result, projects ?? [], people ?? [], homeProject?.id ?? null);
 
     // ---- Nota --------------------------------------------------------
@@ -316,7 +356,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       decisions: result.decisions ?? [],
       people: result.people ?? [],
       questions: result.questions ?? [],
-      ...(pending.topics.length || pending.people.length ? { pending } : {}),
+      ...(pending.topics.length || pending.people.length || pending.entities.length ? { pending } : {}),
     };
     const update: Record<string, unknown> = {
       summary: result.summary,

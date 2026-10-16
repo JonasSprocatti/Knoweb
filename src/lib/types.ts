@@ -14,6 +14,18 @@ export interface Insights {
 export interface PendingCreations {
   topics: { name: string; slug: string; description: string; emoji: string | null; relevance: number }[];
   people: { name: string; slug: string; task_ids: string[] }[];
+  entities?: { kind: EntityKind; name: string; slug: string; description: string }[];
+}
+
+export type EntityKind = "company" | "system";
+export interface Entity {
+  id: string;
+  kind: EntityKind;
+  name: string;
+  slug: string;
+  description: string | null;
+  url: string | null;
+  created_at: string;
 }
 
 export interface Note {
@@ -70,7 +82,7 @@ export interface TopicWithCount extends Topic {
 export interface GraphNode {
   id: string;
   label: string;
-  type: "note" | "recording" | "topic" | "project" | "task" | "person" | "sprint";
+  type: "note" | "recording" | "topic" | "project" | "task" | "person" | "sprint" | "company" | "system";
   weight: number;
   slug?: string;
   /** Cor do tema (ou do tema principal da nota) */
@@ -84,7 +96,7 @@ export interface GraphNode {
 export interface GraphLink {
   source: string;
   target: string;
-  kind: "topic" | "wikilink" | "ai" | "project" | "task" | "assignee" | "mention" | "sprint";
+  kind: "topic" | "wikilink" | "ai" | "project" | "task" | "assignee" | "mention" | "sprint" | "entity";
 }
 
 export type ProjectStatus = "suggested" | "idea" | "active" | "paused" | "done" | "archived";
@@ -100,6 +112,7 @@ export interface Person {
   about: string | null;
   /** A pessoa que é você (dono da conta) */
   is_me?: boolean;
+  company_id?: string | null;
 }
 
 export interface Project {
