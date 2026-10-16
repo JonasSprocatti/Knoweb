@@ -8,7 +8,7 @@ import { finishRecording, requestTranscription, uploadSegment } from "@/lib/uplo
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { defaultRecordingTitle, formatDuration } from "@/lib/text";
 import type { AudioSegment } from "@/lib/types";
-import { AudioUpload } from "@/components/AudioUpload";
+import { FileUpload } from "@/components/FileUpload";
 
 /** Cada pedaço tem no máximo 5 min: fica bem abaixo do limite do Whisper e transcreve enquanto você grava. */
 const SEGMENT_SECONDS = 5 * 60;
@@ -541,7 +541,7 @@ export function Recorder({ userId }: { userId: string }) {
 
       {phase === "idle" && (
         <section className="border-t border-line pt-6">
-          <AudioUpload userId={userId} />
+          <FileUpload userId={userId} />
         </section>
       )}
     </div>

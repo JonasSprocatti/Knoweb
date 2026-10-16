@@ -60,7 +60,7 @@ export function NoteView({
   const [topics, setTopics] = useState(initialTopics);
   const [title, setTitle] = useState(initialNote.title);
   const [content, setContent] = useState(initialNote.content);
-  const [editing, setEditing] = useState(startEditing || (!initialNote.content && initialNote.kind === "note"));
+  const [editing, setEditing] = useState(startEditing || (!initialNote.content && initialNote.kind === "note" && !initialNote.file_path));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -154,6 +154,13 @@ export function NoteView({
     }
   }
 
+  async function openFile() {
+    const tab = window.open("", "_blank"); // abre já no clique, antes do await, para o navegador não bloquear
+    const { data } = await supabaseBrowser().storage.from("files").createSignedUrl(note.file_path!, 3600);
+    if (data?.signedUrl && tab) tab.location.href = data.signedUrl;
+    else tab?.close();
+  }
+
   async function togglePin() {
     const pinned = !note.pinned;
     setNote((n) => ({ ...n, pinned }));
@@ -221,6 +228,11 @@ export function NoteView({
             {note.kind === "recording" ? "Gravação" : "Nota"} criada {relativeDate(note.created_at)}
           </span>
           {note.duration_seconds > 0 && <span>{formatDuration(note.duration_seconds)} de áudio</span>}
+          {note.file_path && (
+            <button type="button" onClick={openFile} className="underline-offset-2 hover:text-ink hover:underline" title="Abrir o arquivo original">
+              📎 {note.file_name ?? "arquivo"}
+            </button>
+          )}
           <StatusBadge status={note.status} />
           <span className="ml-auto flex items-center gap-1">
             <span className="mr-2">

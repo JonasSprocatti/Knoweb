@@ -510,3 +510,25 @@ begin
       'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Arquivos enviados (PDF, prints, textos): o original fica guardado e o
+-- conteúdo lido pelo Claude vira o texto da nota
+-- ---------------------------------------------------------------------
+alter table public.notes add column if not exists file_path text;
+alter table public.notes add column if not exists file_name text;
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('files', 'files', false, 26214400)  -- 25 MB
+on conflict (id) do nothing;
+
+drop policy if exists "files_own_select" on storage.objects;
+drop policy if exists "files_own_insert" on storage.objects;
+drop policy if exists "files_own_delete" on storage.objects;
+
+create policy "files_own_select" on storage.objects for select
+  using (bucket_id = 'files' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "files_own_insert" on storage.objects for insert
+  with check (bucket_id = 'files' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "files_own_delete" on storage.objects for delete
+  using (bucket_id = 'files' and (storage.foldername(name))[1] = auth.uid()::text);
