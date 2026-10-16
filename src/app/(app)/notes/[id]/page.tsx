@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { NoteView, type LinkedNote, type NoteTopic } from "@/components/NoteView";
 import { NoteWork } from "@/components/NoteWork";
 import type { AudioSegment, Note } from "@/lib/types";
+import type { NoteFile } from "@/lib/files";
 
 export const dynamic = "force-dynamic";
 
@@ -27,8 +28,9 @@ export default async function NotePage({
   const { data: note } = await supabase.from("notes").select("*").eq("id", id).maybeSingle();
   if (!note) notFound();
 
-  const [{ data: segments }, { data: topics }, { data: outgoing }, { data: incoming }] = await Promise.all([
+  const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }] = await Promise.all([
     supabase.from("audio_segments").select("*").eq("note_id", id).order("seq"),
+    supabase.from("note_files").select("*").eq("note_id", id).order("created_at"),
     supabase.from("note_topics").select("relevance, source, topics(id, name, slug, color, emoji)").eq("note_id", id).order("relevance", { ascending: false }),
     supabase.from("note_links").select("target_id, kind, reason, notes!note_links_target_id_fkey(id, title)").eq("source_id", id),
     supabase.from("note_links").select("source_id, kind, reason, notes!note_links_source_id_fkey(id, title)").eq("target_id", id),
@@ -58,6 +60,7 @@ export default async function NotePage({
     <NoteView
       initialNote={note as Note}
       initialSegments={(segments ?? []) as AudioSegment[]}
+      initialFiles={(files ?? []) as NoteFile[]}
       initialTopics={noteTopics}
       linked={linked}
       startEditing={edit === "1"}

@@ -512,11 +512,35 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- Arquivos enviados (PDF, prints, textos): o original fica guardado e o
--- conteúdo lido pelo Claude vira o texto da nota
+-- Arquivos (Word, PowerPoint, PDF, prints, textos): o original fica no
+-- bucket privado "files" e o conteúdo lido entra no texto da nota.
+-- Uma nota pode ter vários (nota criada de um arquivo ou "Anexar arquivo").
 -- ---------------------------------------------------------------------
-alter table public.notes add column if not exists file_path text;
-alter table public.notes add column if not exists file_name text;
+create table if not exists public.note_files (
+  id            uuid primary key default gen_random_uuid(),
+  note_id       uuid not null references public.notes(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  path          text not null unique,   -- {user_id}/... no bucket "files"
+  name          text not null,
+  created_at    timestamptz not null default now()
+);
+
+create index if not exists note_files_note_idx on public.note_files (note_id, created_at);
+alter table public.note_files enable row level security;
+drop policy if exists "own_rows" on public.note_files;
+create policy "own_rows" on public.note_files for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Versão anterior guardava um arquivo só, em notes.file_path: passa para note_files
+do $$
+begin
+  if exists (select 1 from information_schema.columns
+             where table_schema = 'public' and table_name = 'notes' and column_name = 'file_path') then
+    insert into public.note_files (note_id, user_id, path, name)
+      select id, user_id, file_path, coalesce(file_name, 'arquivo') from public.notes where file_path is not null
+      on conflict (path) do nothing;
+    alter table public.notes drop column file_path, drop column file_name;
+  end if;
+end $$;
 
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('files', 'files', false, 26214400)  -- 25 MB

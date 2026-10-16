@@ -12,15 +12,12 @@ export async function POST(request: Request) {
     title?: string;
     content?: string;
     kind?: "note" | "recording";
-    status?: "ready" | "recording";
-    /** Arquivo já enviado ao bucket "files" (PDF, print, texto), na pasta do usuário */
-    file_path?: string;
-    file_name?: string;
+    /** "analyzing": nota que vai receber um arquivo (/api/ingest) */
+    status?: "ready" | "recording" | "analyzing";
   };
   const kind = body.kind === "recording" ? "recording" : "note";
-  const status = body.status === "recording" ? "recording" : "ready";
+  const status = body.status === "recording" || body.status === "analyzing" ? body.status : "ready";
   if (body.title && body.title.length > 200) return badRequest("Título muito longo.");
-  if (body.file_path && !body.file_path.startsWith(`${user.id}/`)) return badRequest("Arquivo inválido.");
 
   const { data, error } = await supabase
     .from("notes")
@@ -28,9 +25,7 @@ export async function POST(request: Request) {
       title: body.title?.trim() || "Sem título",
       content: body.content ?? "",
       kind,
-      status: body.file_path ? "analyzing" : status,
-      file_path: body.file_path ?? null,
-      file_name: body.file_name?.slice(0, 200) ?? null,
+      status,
     })
     .select("*")
     .single();

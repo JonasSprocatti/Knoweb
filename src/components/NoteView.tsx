@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, debounce } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { requestTranscription } from "@/lib/upload";
+import { ingestDocument, requestTranscription, uploadDocument } from "@/lib/upload";
+import { DOC_ACCEPT, fileKind, readByAI, UNSUPPORTED, type NoteFile } from "@/lib/files";
 import { formatDuration, relativeDate } from "@/lib/text";
 import type { AudioSegment, Note } from "@/lib/types";
 import { Markdown } from "@/components/Markdown";
@@ -41,6 +42,7 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 export function NoteView({
   initialNote,
   initialSegments,
+  initialFiles,
   initialTopics,
   linked,
   startEditing,
@@ -48,6 +50,7 @@ export function NoteView({
 }: {
   initialNote: Note;
   initialSegments: AudioSegment[];
+  initialFiles: NoteFile[];
   initialTopics: NoteTopic[];
   linked: LinkedNote[];
   startEditing: boolean;
@@ -60,14 +63,19 @@ export function NoteView({
   const [topics, setTopics] = useState(initialTopics);
   const [title, setTitle] = useState(initialNote.title);
   const [content, setContent] = useState(initialNote.content);
-  const [editing, setEditing] = useState(startEditing || (!initialNote.content && initialNote.kind === "note" && !initialNote.file_path));
+  const [editing, setEditing] = useState(startEditing || (!initialNote.content && initialNote.kind === "note" && initialNote.status !== "analyzing"));
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [newTopic, setNewTopic] = useState("");
+  const [files, setFiles] = useState(initialFiles);
+  const [attaching, setAttaching] = useState<string | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const dirtyRef = useRef({ title: false, content: false });
 
   useEffect(() => setTopics(initialTopics), [initialTopics]);
+  useEffect(() => setFiles(initialFiles), [initialFiles]); // nota nova: o anexo entra enquanto ela é lida
 
   // ---- Autosave ------------------------------------------------------
   const save = useMemo(
@@ -154,11 +162,44 @@ export function NoteView({
     }
   }
 
-  async function openFile() {
+  async function openFile(f: NoteFile) {
     const tab = window.open("", "_blank"); // abre já no clique, antes do await, para o navegador não bloquear
-    const { data } = await supabaseBrowser().storage.from("files").createSignedUrl(note.file_path!, 3600);
+    const kind = fileKind(f.name, "");
+    // Link vale 1 min; o que não é PDF nem imagem baixa em vez de abrir no navegador
+    const { data } = await supabaseBrowser()
+      .storage.from("files")
+      .createSignedUrl(f.path, 60, kind === "pdf" || kind === "image" ? undefined : { download: f.name });
     if (data?.signedUrl && tab) tab.location.href = data.signedUrl;
     else tab?.close();
+  }
+
+  /** Junta um arquivo a esta nota: o conteúdo lido entra no fim do texto, à vista, sem reanalisar. */
+  async function attachFile(file: File) {
+    setAttachError(null);
+    const kind = fileKind(file.name, file.type);
+    if (!kind || kind === "audio") return setAttachError(`${file.name}: ${kind === "audio" ? "áudio entra pela tela Gravar." : UNSUPPORTED}`);
+    setAttaching(readByAI(kind) ? `Lendo ${file.name} com o Claude…` : `Lendo ${file.name}…`);
+    setEditing(false); // nada de digitar enquanto o texto do arquivo entra
+    try {
+      if (dirtyRef.current.title || dirtyRef.current.content) await save.flush({ title, content });
+      const path = await uploadDocument(note.user_id, file, kind);
+      const r = await ingestDocument({ noteId: note.id, path, name: file.name, attach: true });
+      if (r.content !== undefined) setContent(r.content);
+      if (r.file) setFiles((prev) => [...prev, r.file!]);
+    } catch (err) {
+      setAttachError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAttaching(null);
+    }
+  }
+
+  async function removeFile(f: NoteFile) {
+    if (!window.confirm(`Apagar o arquivo "${f.name}"? O texto dele que já está na nota continua.`)) return;
+    const supabase = supabaseBrowser();
+    const { error } = await supabase.storage.from("files").remove([f.path]);
+    if (!error) await supabase.from("note_files").delete().eq("id", f.id);
+    if (error) setAttachError(error.message);
+    else setFiles((prev) => prev.filter((x) => x.id !== f.id));
   }
 
   async function togglePin() {
@@ -228,11 +269,6 @@ export function NoteView({
             {note.kind === "recording" ? "Gravação" : "Nota"} criada {relativeDate(note.created_at)}
           </span>
           {note.duration_seconds > 0 && <span>{formatDuration(note.duration_seconds)} de áudio</span>}
-          {note.file_path && (
-            <button type="button" onClick={openFile} className="underline-offset-2 hover:text-ink hover:underline" title="Abrir o arquivo original">
-              📎 {note.file_name ?? "arquivo"}
-            </button>
-          )}
           <StatusBadge status={note.status} />
           <span className="ml-auto flex items-center gap-1">
             <span className="mr-2">
@@ -241,6 +277,27 @@ export function NoteView({
               {saveState === "error" && <span className="text-rec">erro ao salvar</span>}
             </span>
             <IconButton title={note.pinned ? "Desafixar" : "Fixar"} onClick={togglePin} active={note.pinned} icon="pin" />
+            <button
+              type="button"
+              onClick={() => fileInput.current?.click()}
+              disabled={!!attaching || note.status === "analyzing"}
+              title="Anexar arquivo a esta nota (Word, PowerPoint, PDF, print, texto)"
+              aria-label="Anexar arquivo"
+              className="rounded-md p-1.5 transition hover:bg-panel hover:text-ink disabled:opacity-50"
+            >
+              📎
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept={DOC_ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) attachFile(file);
+              }}
+            />
             <IconButton title="Exportar .md (compatível com Obsidian)" onClick={exportMarkdown} icon="notes" />
             <ConfirmDelete
               action={deleteNote.bind(null, note.id)}
@@ -248,12 +305,29 @@ export function NoteView({
               label={<Icon name="trash" className="h-4 w-4" />}
               className="rounded-md p-1.5 transition hover:bg-panel hover:text-ink"
             >
-              <p className="text-muted">A nota e os áudios dela somem. Temas, projetos e pessoas continuam.</p>
+              <p className="text-muted">A nota e os áudios e arquivos dela somem. Temas, projetos e pessoas continuam.</p>
               <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas que saíram dela" />
               <DeleteOption name="tasks" value="delete" label="Excluir as tarefas que saíram dela" />
             </ConfirmDelete>
           </span>
         </div>
+
+        {(files.length > 0 || attaching || attachError) && (
+          <div className="-mb-2 flex flex-wrap items-center gap-2 text-sm">
+            {files.map((f) => (
+              <span key={f.id} className="flex items-center gap-1 rounded-md border border-line px-2 py-0.5 text-muted">
+                <button type="button" onClick={() => openFile(f)} className="hover:text-ink hover:underline" title="Abrir o arquivo original">
+                  📎 {f.name}
+                </button>
+                <button type="button" onClick={() => removeFile(f)} className="rounded p-0.5 text-faint hover:text-rec" aria-label={`Apagar ${f.name}`}>
+                  <Icon name="x" className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {attaching && <span className="text-faint">{attaching}</span>}
+            {attachError && <span className="text-rec">{attachError}</span>}
+          </div>
+        )}
 
         <input
           value={title}
@@ -277,6 +351,7 @@ export function NoteView({
             </button>
             <button
               onClick={() => setEditing(true)}
+              disabled={!!attaching}
               aria-pressed={editing}
               className={`flex items-center gap-1.5 rounded-md px-3 py-1 ${editing ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}
             >
@@ -285,7 +360,7 @@ export function NoteView({
             <span className="ml-3 hidden text-faint sm:inline">Escreva em Markdown. Digite [[ para ligar outra nota.</span>
           </div>
 
-          {editing ? (
+          {editing && !attaching ? (
             <WikiEditor
               value={content}
               autoFocus={startEditing}

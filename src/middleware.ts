@@ -3,6 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
+/** Só estes e-mails usam o app (ALLOWED_EMAILS, separados por vírgula). Vazio: qualquer conta. */
+const ALLOWED = (process.env.ALLOWED_EMAILS ?? "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -29,6 +35,13 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
+
+  // Conta fora da lista: nem as telas nem a API (e as chaves das IAs) ficam disponíveis
+  if (user && ALLOWED.length && !ALLOWED.includes(user.email?.toLowerCase() ?? "") && !isPublic) {
+    return path.startsWith("/api")
+      ? NextResponse.json({ error: "Conta sem acesso." }, { status: 403 })
+      : new NextResponse("Esta conta não tem acesso ao Knoweb.", { status: 403 });
+  }
 
   if (!user && !isPublic && !path.startsWith("/api")) {
     const url = request.nextUrl.clone();

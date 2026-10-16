@@ -29,9 +29,6 @@ export interface Note {
   duration_seconds: number;
   pinned: boolean;
   cover_path?: string | null;
-  /** Arquivo original (PDF, print, texto) no bucket "files" */
-  file_path?: string | null;
-  file_name?: string | null;
   analyzed_at: string | null;
   created_at: string;
   updated_at: string;

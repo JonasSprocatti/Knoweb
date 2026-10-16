@@ -2,6 +2,7 @@
 
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { baseMime, extensionFor } from "@/lib/audio";
+import { MAX_DOC_BYTES, MAX_IMAGE_BYTES, type FileKind, type NoteFile } from "@/lib/files";
 
 async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let lastError: unknown;
@@ -74,4 +75,25 @@ export function requestTranscription(segmentId: string) {
 export async function finishRecording(noteId: string) {
   const r = await fetch(`/api/notes/${noteId}/finish`, { method: "POST" });
   return r.ok;
+}
+
+/** Envia um documento (Word, PowerPoint, PDF, print, texto) direto para o Storage e devolve o caminho. */
+export async function uploadDocument(userId: string, file: File, kind: FileKind): Promise<string> {
+  const max = kind === "image" ? MAX_IMAGE_BYTES : MAX_DOC_BYTES;
+  if (file.size > max) throw new Error(`${file.name}: maior que ${max / 1024 / 1024} MB.`);
+  const path = `${userId}/${crypto.randomUUID()}/${file.name.replace(/[^\w.\-]+/g, "_")}`;
+  const { error } = await supabaseBrowser().storage.from("files").upload(path, file, { contentType: file.type || undefined });
+  if (error) throw new Error(`${file.name}: ${error.message}`);
+  return path;
+}
+
+/**
+ * Lê o arquivo já enviado e põe o conteúdo na nota. Com `attach`, junta ao fim
+ * de uma nota que já existe (sem reanalisar); sem, preenche a nota nova e analisa.
+ */
+export async function ingestDocument(body: { noteId: string; path: string; name: string; attach?: boolean }) {
+  const r = await fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error ?? `Erro ${r.status}`);
+  return data as { content?: string; file?: NoteFile };
 }

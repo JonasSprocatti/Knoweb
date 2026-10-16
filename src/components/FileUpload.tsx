@@ -4,13 +4,13 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { MAX_UPLOAD_BYTES, readAudioDuration } from "@/lib/audio";
-import { DOC_ACCEPT, fileKind, MAX_DOC_BYTES, MAX_IMAGE_BYTES } from "@/lib/files";
-import { supabaseBrowser } from "@/lib/supabase/client";
-import { finishRecording, requestTranscription, uploadSegment } from "@/lib/upload";
+import { DOC_ACCEPT, fileKind, UNSUPPORTED, type FileKind } from "@/lib/files";
+import { finishRecording, ingestDocument, requestTranscription, uploadDocument, uploadSegment } from "@/lib/upload";
 
 /**
  * Envia arquivos que já existem: áudio (gravador, WhatsApp, Teams…) vai para a
- * transcrição; PDF, print e texto são lidos pelo Claude. Cada arquivo vira uma nota.
+ * transcrição; Word, PowerPoint e texto são lidos no servidor, PDF e print pelo Claude.
+ * Cada arquivo vira uma nota nova (para pôr numa nota que já existe, use "Anexar" na nota).
  */
 export function FileUpload({ userId }: { userId: string }) {
   const router = useRouter();
@@ -29,16 +29,11 @@ export function FileUpload({ userId }: { userId: string }) {
     return note.id;
   }
 
-  async function sendDocument(file: File, kind: "image" | "pdf" | "text") {
-    const max = kind === "image" ? MAX_IMAGE_BYTES : MAX_DOC_BYTES;
-    if (file.size > max) throw new Error(`${file.name}: maior que ${max / 1024 / 1024} MB.`);
-    // Direto do navegador para o Storage, sem passar pelo limite de upload da Vercel
-    const path = `${userId}/${crypto.randomUUID()}/${file.name.replace(/[^\w.\-]+/g, "_")}`;
-    const { error } = await supabaseBrowser().storage.from("files").upload(path, file, { contentType: file.type || undefined });
-    if (error) throw new Error(`${file.name}: ${error.message}`);
-    const note = await api.createNote({ title: file.name.replace(/\.[^.]+$/, ""), file_path: path, file_name: file.name });
+  async function sendDocument(file: File, kind: Exclude<FileKind, "audio">) {
+    const path = await uploadDocument(userId, file, kind);
+    const note = await api.createNote({ title: file.name.replace(/\.[^.]+$/, ""), status: "analyzing" });
     // O servidor lê e analisa mesmo se você sair da página
-    fetch("/api/ingest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ noteId: note.id }) }).catch(() => undefined);
+    ingestDocument({ noteId: note.id, path, name: file.name }).catch(() => undefined);
     return note.id;
   }
 
@@ -50,7 +45,7 @@ export function FileUpload({ userId }: { userId: string }) {
     for (const file of files) {
       const kind = fileKind(file.name, file.type);
       try {
-        if (!kind) throw new Error(`${file.name}: formato não suportado. Envie áudio, PDF, imagem ou texto (Word: salve como PDF).`);
+        if (!kind) throw new Error(`${file.name}: ${UNSUPPORTED}`);
         ids.push(kind === "audio" ? await sendAudio(file) : await sendDocument(file, kind));
       } catch (err) {
         errors.push(err instanceof Error ? err.message : String(err));
@@ -81,9 +76,9 @@ export function FileUpload({ userId }: { userId: string }) {
         disabled={busy}
         className="rounded-lg border border-dashed border-line px-4 py-2 text-sm text-muted transition hover:border-accent hover:text-ink disabled:opacity-60"
       >
-        {busy ? "Enviando…" : "Ou envie arquivos: áudio, PDF, prints, textos"}
+        {busy ? "Enviando…" : "Ou envie arquivos: áudio, Word, PowerPoint, PDF, prints, textos"}
       </button>
-      <p className="text-xs text-faint">Cada arquivo vira uma nota, lida pelo Claude e ligada à teia.</p>
+      <p className="text-xs text-faint">Cada arquivo vira uma nota nova ligada à teia. Para juntar a uma nota que já existe, abra a nota e use “Anexar arquivo”.</p>
       {error && <p className="max-w-md whitespace-pre-line text-sm text-rec">{error}</p>}
     </div>
   );

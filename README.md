@@ -95,11 +95,44 @@ As rotas de transcrição e análise pedem até 300 s de execução (`maxDuratio
 | `OPENAI_API_KEY` | Chave da OpenAI para o Whisper |
 | `OPENAI_TRANSCRIBE_MODEL` | Padrão `whisper-1` (o único que devolve marcas de tempo por trecho) |
 | `TRANSCRIBE_LANGUAGE` | Idioma das gravações, padrão `pt` |
-| `GEMINI_API_KEY` | Chave do Gemini ([aistudio.google.com](https://aistudio.google.com), tem plano gratuito). Com o seletor em "Gemini", ele transcreve, analisa e responde no lugar de Claude + Whisper |
+| `GEMINI_API_KEY` | Chave do Gemini ([aistudio.google.com](https://aistudio.google.com)). Com o seletor em "Gemini", ele transcreve, analisa e responde no lugar de Claude + Whisper. **No plano gratuito o Google pode usar o conteúdo**; para dados de trabalho, só com faturamento ativo |
 | `GEMINI_MODEL` | Padrão `gemini-2.5-flash` |
 | `AI_PROVIDER` | `claude` ou `gemini`: o padrão enquanto o seletor do app não foi usado |
+| `ALLOWED_EMAILS` | E-mails que podem usar o app, separados por vírgula. Qualquer outra conta recebe "sem acesso", nas telas e na API |
 
 O app não usa a `service_role` do Supabase: todas as rotas agem como o usuário logado, e o Postgres garante o isolamento pelas regras de RLS.
+
+## Segurança e privacidade
+
+Para mostrar a quem cuida da segurança na empresa.
+
+**Para onde vai cada dado**
+
+| O quê | Quem lê | Sai do app? |
+|---|---|---|
+| Notas, transcrições, arquivos originais | Supabase (Postgres + Storage privados) | Fica no seu projeto Supabase, na região escolhida ao criá-lo |
+| Word (.docx), PowerPoint (.pptx), textos | O próprio servidor do app extrai o texto | Não vai para IA nenhuma na leitura |
+| PDF e imagens | Claude lê o arquivo | Sim, para a API da Anthropic |
+| Áudio | Whisper (ou Gemini, se escolhido) | Sim, para a API da OpenAI (ou Google) |
+| Análise (resumo, temas, tarefas) e "Perguntar" | Claude (ou Gemini) | Sim, o texto da nota / os trechos encontrados |
+
+- Anexar um arquivo a uma nota existente (📎) não dispara a análise: nada além da leitura acima sai do app até você clicar em **Analisar**.
+- As APIs da Anthropic e da OpenAI, por padrão, não usam o que é enviado para treinar modelos e guardam por pouco tempo (confira os termos comerciais atuais de cada uma; ambas oferecem retenção zero por contrato). O Gemini **gratuito** pode usar o conteúdo; não use com dados de trabalho sem faturamento ativo.
+- As chaves das IAs ficam só no servidor (variáveis da Vercel). O navegador nunca fala com as IAs: a CSP só deixa ele conectar no próprio app e no Supabase.
+
+**O que o app faz**
+
+- Cada usuário só enxerga as próprias linhas e arquivos (RLS no Postgres e no Storage). O app não usa a `service_role`.
+- Buckets privados; links para abrir um arquivo valem 1 minuto, e o que não é PDF nem imagem é baixado em vez de aberto no navegador.
+- Cabeçalhos de segurança: CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, `Permissions-Policy` (só microfone), respostas da API com `Cache-Control: no-store`. O service worker não guarda dados no aparelho.
+- `ALLOWED_EMAILS` fecha o app para qualquer conta que não seja a sua.
+- Excluir uma nota apaga também os áudios, imagens e arquivos dela no Storage.
+- Arquivos do Office são lidos com limite de tamanho descompactado (proteção contra "zip bomb").
+
+**O que você configura no Supabase**
+
+- **Authentication → Sign In / Providers**: desligue novos cadastros depois de criar a sua conta.
+- Use uma senha forte e única; o e-mail de trabalho só se a política da empresa permitir.
 
 ## Uso
 
@@ -108,6 +141,7 @@ O app não usa a `service_role` do Supabase: todas as rotas agem como o usuário
 - **Nota**: alterna entre *Ler* e *Editar*. O painel lateral mostra a análise do Claude, os temas (adicione ou remova à mão), as notas relacionadas pelo Claude, os seus links e quem menciona esta nota. Na transcrição, clique numa marca de tempo para ouvir daquele ponto.
 - **Temas**: cada tema lista suas notas e os temas que costumam aparecer junto.
 - **Teia**: grafo interativo. Laranja são `[[links]]` seus, tracejado verde são ligações sugeridas pelo Claude. Passe o mouse para destacar vizinhos, clique para abrir.
+- **Arquivos**: na tela Gravar, cada arquivo enviado (áudio, Word, PowerPoint, PDF, print, texto) vira uma nota nova. Para pôr um arquivo numa nota que já existe, abra a nota e clique no 📎: o texto do arquivo entra no fim da nota, sob o nome dele, e a análise **não** roda sozinha. O original fica anexado (clique para abrir, × para apagar).
 - **Perguntar**: pergunte em linguagem natural; o Claude responde só com base nas suas notas e cita as fontes como `[[links]]` clicáveis.
 
 ## Limitações conhecidas
@@ -119,7 +153,8 @@ O app não usa a `service_role` do Supabase: todas as rotas agem como o usuário
 
 ## Próximos passos possíveis
 
-- Usar o Gemini (plano gratuito) no lugar de Claude + Whisper. O código já existe (`src/lib/server/gemini.ts`), só está desligado: cadastre `GEMINI_API_KEY` e o seletor Claude/Gemini aparece no app.
+- Usar o Gemini no lugar de Claude + Whisper. O código já existe (`src/lib/server/gemini.ts`), só está desligado: cadastre `GEMINI_API_KEY` e o seletor Claude/Gemini aparece no app.
+- Login com segundo fator (MFA/TOTP do Supabase): precisa de uma tela para cadastrar e pedir o código, que o app ainda não tem.
 - Busca semântica com `pgvector` (embeddings) para o "Perguntar" achar notas por significado.
 - Separação de falantes com um serviço de diarização (Deepgram, AssemblyAI).
 - Sincronização com um vault do Obsidian (exportar/importar a base inteira como pasta de `.md`).

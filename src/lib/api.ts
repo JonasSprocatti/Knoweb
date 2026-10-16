@@ -9,7 +9,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  createNote: (body: { title?: string; content?: string; kind?: "note" | "recording"; status?: "ready" | "recording"; file_path?: string; file_name?: string }) =>
+  createNote: (body: { title?: string; content?: string; kind?: "note" | "recording"; status?: "ready" | "recording" | "analyzing" }) =>
     fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(
       (r) => json<Note>(r),
     ),
@@ -45,7 +45,7 @@ export const api = {
 };
 
 /** Debounce simples para autosave. */
-export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
+export function debounce<A extends unknown[]>(fn: (...args: A) => void | Promise<void>, ms: number) {
   let t: ReturnType<typeof setTimeout> | undefined;
   const debounced = (...args: A) => {
     if (t) clearTimeout(t);
@@ -53,7 +53,7 @@ export function debounce<A extends unknown[]>(fn: (...args: A) => void, ms: numb
   };
   debounced.flush = (...args: A) => {
     if (t) clearTimeout(t);
-    fn(...args);
+    return fn(...args);
   };
   return debounced;
 }
