@@ -21,7 +21,6 @@ export const api = {
       body: JSON.stringify(body),
     }).then((r) => json<{ id: string; title: string; updated_at: string }>(r)),
 
-  deleteNote: (id: string) => fetch(`/api/notes/${id}`, { method: "DELETE" }).then((r) => json<{ ok: true }>(r)),
 
   analyze: (noteId: string) =>
     fetch("/api/analyze", {

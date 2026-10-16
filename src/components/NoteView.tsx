@@ -15,6 +15,8 @@ import { WikiEditor } from "@/components/WikiEditor";
 import { Transcript } from "@/components/Transcript";
 import { TopicChip } from "@/components/TopicChip";
 import { CoverPicker } from "@/components/CoverPicker";
+import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
+import { deleteNote } from "@/lib/work-actions";
 
 export interface NoteTopic {
   id: string;
@@ -158,13 +160,6 @@ export function NoteView({
     await api.updateNote(note.id, { pinned }).catch(() => setNote((n) => ({ ...n, pinned: !pinned })));
   }
 
-  async function remove() {
-    if (!confirm("Apagar esta nota e os áudios dela? Não dá para desfazer.")) return;
-    await api.deleteNote(note.id);
-    router.push("/notes");
-    router.refresh();
-  }
-
   async function addTopic(e: React.FormEvent) {
     e.preventDefault();
     const name = newTopic.trim();
@@ -235,7 +230,16 @@ export function NoteView({
             </span>
             <IconButton title={note.pinned ? "Desafixar" : "Fixar"} onClick={togglePin} active={note.pinned} icon="pin" />
             <IconButton title="Exportar .md (compatível com Obsidian)" onClick={exportMarkdown} icon="notes" />
-            <IconButton title="Apagar" onClick={remove} icon="trash" />
+            <ConfirmDelete
+              action={deleteNote.bind(null, note.id)}
+              title="Excluir esta nota?"
+              label={<Icon name="trash" className="h-4 w-4" />}
+              className="rounded-md p-1.5 transition hover:bg-panel hover:text-ink"
+            >
+              <p className="text-muted">A nota e os áudios dela somem. Temas, projetos e pessoas continuam.</p>
+              <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas que saíram dela" />
+              <DeleteOption name="tasks" value="delete" label="Excluir as tarefas que saíram dela" />
+            </ConfirmDelete>
           </span>
         </div>
 

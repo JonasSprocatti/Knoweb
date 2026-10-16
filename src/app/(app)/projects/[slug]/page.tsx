@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { acceptSuggested, deleteProject, linkNote, saveProject, setProjectStatus, unlinkNote } from "@/lib/work-actions";
+import { acceptSuggested, deleteProject, linkNote, saveProject, setProjectStatus, templateFromProject, unlinkNote } from "@/lib/work-actions";
 import {
+  Calendar,
   cycleDays,
   days,
   formatDay,
@@ -22,15 +23,16 @@ import {
   today,
 } from "@/components/Work";
 import { TopicChip } from "@/components/TopicChip";
+import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
 import type { ProjectStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
 
-export default async function ProjectPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ visao?: string }> }) {
+export default async function ProjectPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ visao?: string; mes?: string }> }) {
   const { slug } = await params;
-  const { visao = "quadro" } = await searchParams;
+  const { visao = "quadro", mes } = await searchParams;
   const supabase = await supabaseServer();
 
   const { data: project } = await supabase
@@ -148,6 +150,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                 ["quadro", "Quadro"],
                 ["lista", "Lista"],
                 ["linha", "Linha do tempo"],
+                ["calendario", "Calendário"],
               ].map(([k, label]) => (
                 <Link key={k} href={`/projects/${slug}?visao=${k}`} className={`rounded px-3 py-1 ${visao === k ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}>
                   {label}
@@ -170,7 +173,14 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
           <QuickTask projects={projects ?? []} people={people ?? []} projectId={project.id} />
 
-          {visao === "lista" ? (
+          {visao === "calendario" ? (
+            <Calendar
+              month={/^\d{4}-(0[1-9]|1[0-2])$/.test(mes ?? "") ? mes! : today().slice(0, 7)}
+              tasks={real}
+              projects={[project]}
+              hrefFor={(m) => `/projects/${slug}?visao=calendario&mes=${m}`}
+            />
+          ) : visao === "lista" ? (
             <TaskList tasks={real} showProject={false} />
           ) : visao === "linha" ? (
             <Timeline
@@ -269,9 +279,19 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
               <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Salvar</button>
             </form>
-            <form action={deleteProject.bind(null, project.id, "/projects")} className="mt-3">
-              <button className="text-sm text-rec hover:underline">Apagar projeto (as tarefas ficam sem projeto)</button>
+            <form action={templateFromProject.bind(null, project.id)} className="mt-3">
+              <button className="text-sm text-muted hover:text-ink hover:underline">Salvar como modelo</button>
             </form>
+            <div className="mt-3">
+              <ConfirmDelete action={deleteProject.bind(null, project.id, "/projects")} title={`Excluir o projeto “${project.name}”?`} label="Excluir projeto">
+                <p className="font-medium">Tarefas ({real.length + suggested.length})</p>
+                <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Elas continuam existindo, sem projeto." />
+                <DeleteOption name="tasks" value="delete" label="Excluir as tarefas junto" />
+                <p className="mt-2 font-medium">Notas ligadas ({notes.length})</p>
+                <DeleteOption name="notes" value="keep" defaultChecked label="Manter as notas" hint="Só o vínculo com o projeto some." />
+                <DeleteOption name="notes" value="delete" label="Excluir as notas ligadas também" hint="Inclui os áudios delas." />
+              </ConfirmDelete>
+            </div>
           </details>
 
           <Link

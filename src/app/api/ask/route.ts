@@ -68,7 +68,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
     supabase.from("projects").select("name, status, description, due_date, owner:people!projects_owner_id_fkey(name)").not("status", "in", "(archived)").limit(60),
     supabase
       .from("tasks")
-      .select("number, title, status, priority, due_date, estimate_hours, spent_hours, completed_at, projects(name), task_assignees(people(name))")
+      .select("number, title, status, priority, due_date, estimate_hours, spent_hours, completed_at, recurrence, projects(name), sprints(name), task_assignees(people(name))")
       .neq("status", "canceled")
       .order("updated_at", { ascending: false })
       .limit(150),
@@ -80,7 +80,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
     ),
     ...(tasks ?? []).map((t) => {
       const who = (t.task_assignees ?? []).map((a) => name(a.people)).filter(Boolean).join(", ");
-      return `T-${t.number} "${t.title}" [${t.status}, ${t.priority}]${name(t.projects) ? ` projeto ${name(t.projects)}` : ""}${who ? ` com ${who}` : ""}${t.due_date ? ` prazo ${t.due_date}` : ""}${t.estimate_hours ? ` est. ${t.estimate_hours}h` : ""}${Number(t.spent_hours) ? ` gasto ${t.spent_hours}h` : ""}${t.completed_at ? ` feita em ${String(t.completed_at).slice(0, 10)}` : ""}`;
+      return `T-${t.number} "${t.title}" [${t.status}, ${t.priority}]${name(t.projects) ? ` projeto ${name(t.projects)}` : ""}${who ? ` com ${who}` : ""}${t.due_date ? ` prazo ${t.due_date}` : ""}${t.estimate_hours ? ` est. ${t.estimate_hours}h` : ""}${Number(t.spent_hours) ? ` gasto ${t.spent_hours}h` : ""}${t.completed_at ? ` feita em ${String(t.completed_at).slice(0, 10)}` : ""}${name(t.sprints) ? ` sprint ${name(t.sprints)}` : ""}${t.recurrence ? ` repete ${t.recurrence}` : ""}`;
     }),
   ].join("\n");
 

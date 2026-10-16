@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AutoSelect } from "@/components/AutoSelect";
 import { saveTask, setTaskStatus } from "@/lib/work-actions";
 import { topicColor } from "@/lib/topicColor";
-import type { Person, Project, ProjectStatus, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
+import type { Person, Project, ProjectStatus, Recurrence, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
 
 /** Colunas das listas de tarefas, já com projeto e responsáveis. */
 export const TASK_COLUMNS = "*, projects(id, name, slug, emoji, color), task_assignees(people(id, name, slug))";
@@ -18,6 +18,14 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; color: string }> =
 export const BOARD: TaskStatus[] = ["todo", "doing", "blocked", "done"];
 
 export const PRIORITY: Record<TaskPriority, string> = { urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa" };
+
+export const RECURRENCE: Record<Recurrence, string> = {
+  daily: "Todo dia",
+  weekdays: "Dias úteis",
+  weekly: "Toda semana",
+  biweekly: "A cada 2 semanas",
+  monthly: "Todo mês",
+};
 
 export const PROJECT_STATUS: Record<ProjectStatus, string> = {
   suggested: "Sugerido",
@@ -114,6 +122,11 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
         </Link>
       )}
       <People people={task.task_assignees.map((a) => a.people)} />
+      {task.recurrence && (
+        <span className="text-xs text-faint" title={RECURRENCE[task.recurrence]}>
+          ↻ {RECURRENCE[task.recurrence]}
+        </span>
+      )}
       {(task.priority === "high" || task.priority === "urgent") && (
         <span className="text-xs font-semibold text-rec">{PRIORITY[task.priority]}</span>
       )}
@@ -209,18 +222,21 @@ export function QuickTask({
   projectId,
   noteId,
   parentId,
+  sprintId,
 }: {
   projects: Pick<Project, "id" | "name" | "emoji">[];
   people: Pick<Person, "id" | "name">[];
   projectId?: string;
   noteId?: string;
   parentId?: string;
+  sprintId?: string;
 }) {
   return (
     <form action={saveTask} className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line p-2.5">
       <input type="hidden" name="assignees_present" value="1" />
       {noteId && <input type="hidden" name="note_id" value={noteId} />}
       {parentId && <input type="hidden" name="parent_id" value={parentId} />}
+      {sprintId && <input type="hidden" name="sprint_id" value={sprintId} />}
       <input name="title" required placeholder={parentId ? "+ Subtarefa" : "+ Nova tarefa"} aria-label="Tarefa" className={`${input} min-w-48 flex-1`} />
       {projectId ? (
         <input type="hidden" name="project_id" value={projectId} />
@@ -251,6 +267,14 @@ export function QuickTask({
           </option>
         ))}
       </select>
+      <select name="recurrence" aria-label="Repetir" defaultValue="" className={input}>
+        <option value="">Não repete</option>
+        {Object.entries(RECURRENCE).map(([k, v]) => (
+          <option key={k} value={k}>
+            ↻ {v}
+          </option>
+        ))}
+      </select>
       <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Criar</button>
     </form>
   );
@@ -264,4 +288,77 @@ export function normalizeTasks(rows: unknown[] | null): TaskRow[] {
     projects: one(t.projects),
     task_assignees: (t.task_assignees ?? []).map((a) => ({ people: one(a.people) })),
   }));
+}
+
+const WEEKDAYS = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+
+/** Calendário do mês (como a visão Calendar do Notion): tarefas no dia do prazo, projetos no dia da entrega. */
+export function Calendar({
+  month,
+  tasks,
+  projects = [],
+  hrefFor,
+}: {
+  /** AAAA-MM */
+  month: string;
+  tasks: TaskRow[];
+  projects?: { id: string; name: string; slug: string; emoji: string | null; color: string | null; due_date: string | null }[];
+  hrefFor: (month: string) => string;
+}) {
+  const [y, m] = month.split("-").map(Number);
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lead = (first.getUTCDay() + 6) % 7; // semana começa na segunda
+  const iso = (d: number) => `${month}-${String(d).padStart(2, "0")}`;
+  const shift = (n: number) => new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+  const now = today();
+  const cells = [...Array(lead).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  while (cells.length % 7) cells.push(null);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
+        <Link href={hrefFor(shift(-1))} className="rounded-md border border-line px-2.5 py-1 text-muted hover:text-ink" aria-label="Mês anterior">‹</Link>
+        <h2 className="min-w-40 text-center font-semibold capitalize">
+          {first.toLocaleDateString("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" })}
+        </h2>
+        <Link href={hrefFor(shift(1))} className="rounded-md border border-line px-2.5 py-1 text-muted hover:text-ink" aria-label="Próximo mês">›</Link>
+        <Link href={hrefFor(now.slice(0, 7))} className="text-sm text-muted hover:text-ink">Hoje</Link>
+      </div>
+      <div className="overflow-x-auto">
+        <div className="grid min-w-[42rem] grid-cols-7 overflow-hidden rounded-lg border border-line bg-line [gap:1px]">
+          {WEEKDAYS.map((d) => (
+            <div key={d} className="bg-surface px-2 py-1 text-xs font-semibold text-faint">{d}</div>
+          ))}
+          {cells.map((d, i) => {
+            if (d == null) return <div key={`x${i}`} className="min-h-24 bg-surface/60" />;
+            const day = iso(d);
+            const dayTasks = tasks.filter((t) => t.due_date === day);
+            const dayProjects = projects.filter((p) => p.due_date === day);
+            return (
+              <div key={day} className={`flex min-h-24 flex-col gap-1 bg-panel p-1.5 ${day === now ? "ring-2 ring-inset ring-accent" : ""}`}>
+                <span className={`text-xs tabular-nums ${day === now ? "font-bold text-accent" : "text-faint"}`}>{d}</span>
+                {dayProjects.map((p) => (
+                  <Link key={p.id} href={`/projects/${p.slug}`} className="truncate rounded px-1 text-xs font-semibold text-white" style={{ background: projectColor(p) }}>
+                    {p.emoji} {p.name}
+                  </Link>
+                ))}
+                {dayTasks.map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/tasks/${t.id}`}
+                    title={t.title}
+                    className={`flex items-center gap-1 truncate text-xs hover:underline ${t.status === "done" ? "text-faint line-through" : isOpen(t.status) && day < now ? "text-rec" : "text-ink"}`}
+                  >
+                    <StatusDot status={t.status} />
+                    <span className="truncate">{t.title}</span>
+                  </Link>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }

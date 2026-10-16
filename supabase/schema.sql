@@ -354,6 +354,11 @@ begin
     values (new.id, new.user_id, 'project',
             (select name from public.projects where id = old.project_id), (select name from public.projects where id = new.project_id));
   end if;
+  if new.sprint_id is distinct from old.sprint_id then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value)
+    values (new.id, new.user_id, 'sprint',
+            (select name from public.sprints where id = old.sprint_id), (select name from public.sprints where id = new.sprint_id));
+  end if;
   if new.priority is distinct from old.priority then
     insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'priority', old.priority, new.priority);
   end if;
@@ -415,6 +420,90 @@ do $$
 declare t text;
 begin
   foreach t in array array['people', 'projects', 'tasks', 'task_assignees', 'task_dependencies', 'project_notes', 'note_people', 'task_events'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own_rows" on public.%I', t);
+    execute format(
+      'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+  end loop;
+end $$;
+
+-- =====================================================================
+-- Sprints, modelos de projeto, tarefas recorrentes
+-- (rode este bloco no SQL Editor; é idempotente)
+-- =====================================================================
+create table if not exists public.sprints (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name          text not null,
+  goal          text,
+  start_date    date not null,
+  end_date      date not null,
+  created_at    timestamptz not null default now(),
+  check (end_date >= start_date)
+);
+
+alter table public.tasks add column if not exists sprint_id uuid references public.sprints(id) on delete set null;
+-- Repetição: quando a tarefa é concluída, a próxima nasce sozinha
+alter table public.tasks add column if not exists recurrence text
+  check (recurrence in ('daily', 'weekdays', 'weekly', 'biweekly', 'monthly'));
+create index if not exists tasks_sprint_idx on public.tasks (sprint_id);
+
+-- Modelo de projeto: descrição + lista de tarefas (prazo relativo ao início)
+create table if not exists public.templates (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name          text not null,
+  emoji         text,
+  description   text,
+  tasks         jsonb not null default '[]'::jsonb,  -- [{title, description, priority, estimate_hours, offset_days, recurrence}]
+  created_at    timestamptz not null default now()
+);
+
+create or replace function public.next_due(d date, rec text) returns date
+language plpgsql immutable as $$
+begin
+  return case rec
+    when 'daily' then d + 1
+    when 'weekdays' then d + case extract(isodow from d)::int when 5 then 3 when 6 then 2 else 1 end
+    when 'weekly' then d + 7
+    when 'biweekly' then d + 14
+    when 'monthly' then (d + interval '1 month')::date
+  end;
+end $$;
+
+create or replace function public.task_recur() returns trigger
+language plpgsql security invoker as $$
+declare
+  due date;
+  nid uuid;
+  nnum bigint;
+begin
+  if new.recurrence is null or new.status <> 'done' or old.status = 'done' then
+    return new;
+  end if;
+  -- Próximo prazo a partir do prazo atual; se a tarefa atrasou, pula para o próximo ainda no futuro
+  due := public.next_due(coalesce(new.due_date, current_date), new.recurrence);
+  while due < current_date loop
+    due := public.next_due(due, new.recurrence);
+  end loop;
+  insert into public.tasks (user_id, project_id, parent_id, note_id, title, description, priority, estimate_hours, recurrence, status, source, due_date)
+  values (new.user_id, new.project_id, new.parent_id, new.note_id, new.title, new.description, new.priority, new.estimate_hours, new.recurrence, 'todo', 'manual', due)
+  returning id, number into nid, nnum;
+  insert into public.task_assignees (task_id, person_id, user_id)
+  select nid, person_id, user_id from public.task_assignees where task_id = new.id;
+  insert into public.task_events (task_id, user_id, kind, new_value) values (new.id, new.user_id, 'recurred', 'T-' || nnum);
+  new.recurrence := null;  -- a repetição segue na tarefa nova
+  return new;
+end $$;
+
+drop trigger if exists tasks_recur on public.tasks;
+create trigger tasks_recur before update on public.tasks
+for each row execute function public.task_recur();
+
+do $$
+declare t text;
+begin
+  foreach t in array array['sprints', 'templates'] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists "own_rows" on public.%I', t);
     execute format(

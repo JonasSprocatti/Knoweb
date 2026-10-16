@@ -12,7 +12,7 @@ const GraphCanvas3D = dynamic(() => import("@/components/GraphCanvas3D"), { ssr:
 
 const idOf = (end: string | SimNode) => (typeof end === "string" ? end : end.id);
 const isHub = (n: SimNode) => n.type === "topic" || n.type === "project";
-const WORK = new Set<GraphNode["type"]>(["project", "task", "person"]);
+const WORK = new Set<GraphNode["type"]>(["project", "task", "person", "sprint"]);
 const radius = (n: SimNode) => (isHub(n) ? 4.5 + Math.sqrt(n.weight) * 1.7 : 2.6 + Math.sqrt(n.weight)) * (n.image ? 1.5 : 1);
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" });
@@ -181,6 +181,7 @@ export function GraphView() {
     } else if (n.type === "project") router.push(`/projects/${n.slug}`);
     else if (n.type === "person") router.push(`/people/${n.slug}`);
     else if (n.type === "task") router.push(`/tasks/${taskId}`);
+    else if (n.type === "sprint") router.push(`/sprints/${taskId}`);
     else router.push(`/notes/${n.id}`);
   };
   const tooltip = (n: SimNode) => escapeHtml(n.emoji ? `${n.emoji} ${n.label}` : n.label);

@@ -7,6 +7,7 @@ import type { GraphLink, GraphNode } from "@/lib/types";
 const NO_TOPIC_COLOR = "#D6CEC2";
 const PERSON_COLOR = "#B5523B";
 const TASK_COLOR = "#8A8073";
+const SPRINT_COLOR = "#3F7A93";
 
 /**
  * Nós (notas, temas, projetos, tarefas, pessoas) e arestas (nota↔tema,
@@ -17,22 +18,23 @@ export async function GET() {
   const { supabase, user } = await requireUser();
   if (!user) return unauthorized();
 
-  const [notes, topics, noteTopics, links, projects, tasks, people, projectNotes, assignees, notePeople, deps] = await Promise.all([
+  const [notes, topics, noteTopics, links, projects, tasks, people, projectNotes, assignees, notePeople, deps, sprints] = await Promise.all([
     supabase.from("notes").select("id, title, kind, created_at, cover_path").limit(3000),
     supabase.from("topics").select("id, name, slug, color, emoji, cover_path, created_at"),
     supabase.from("note_topics").select("note_id, topic_id, relevance"),
     supabase.from("note_links").select("source_id, target_id, kind"),
     supabase.from("projects").select("id, name, slug, color, emoji, owner_id, created_at").not("status", "in", "(suggested,archived)"),
-    supabase.from("tasks").select("id, number, title, status, project_id, parent_id, note_id, created_at").not("status", "in", "(suggested,canceled)").limit(3000),
+    supabase.from("tasks").select("id, number, title, status, project_id, parent_id, note_id, sprint_id, created_at").not("status", "in", "(suggested,canceled)").limit(3000),
     supabase.from("people").select("id, name, slug, created_at"),
     supabase.from("project_notes").select("project_id, note_id"),
     supabase.from("task_assignees").select("task_id, person_id"),
     supabase.from("note_people").select("note_id, person_id"),
     supabase.from("task_dependencies").select("task_id, blocked_by"),
+    supabase.from("sprints").select("id, name, created_at"),
   ]);
   const err =
     notes.error || topics.error || noteTopics.error || links.error || projects.error || tasks.error ||
-    people.error || projectNotes.error || assignees.error || notePeople.error || deps.error;
+    people.error || projectNotes.error || assignees.error || notePeople.error || deps.error || sprints.error;
   if (err) return serverError(err);
 
   const degree = new Map<string, number>();
@@ -66,6 +68,7 @@ export async function GET() {
     ...(projects.data ?? []).map((p) => `p:${p.id}`),
     ...(tasks.data ?? []).map((t) => `k:${t.id}`),
     ...(people.data ?? []).map((p) => `u:${p.id}`),
+    ...(sprints.data ?? []).map((s) => `s:${s.id}`),
   ]);
   const link = (source: string, target: string, kind: GraphLink["kind"]) => {
     if (!ids.has(source) || !ids.has(target)) return; // sugestões e arquivados ficam de fora
@@ -79,6 +82,7 @@ export async function GET() {
     if (t.project_id) link(`k:${t.id}`, `p:${t.project_id}`, "task");
     if (t.parent_id) link(`k:${t.id}`, `k:${t.parent_id}`, "task");
     if (t.note_id) link(`k:${t.id}`, t.note_id, "task");
+    if (t.sprint_id) link(`k:${t.id}`, `s:${t.sprint_id}`, "sprint");
   }
   for (const d of deps.data ?? []) link(`k:${d.task_id}`, `k:${d.blocked_by}`, "task");
   for (const a of assignees.data ?? []) link(`k:${a.task_id}`, `u:${a.person_id}`, "assignee");
@@ -145,6 +149,14 @@ export async function GET() {
       weight: degree.get(`u:${p.id}`) ?? 0,
       color: PERSON_COLOR,
       created_at: p.created_at as string,
+    })),
+    ...(sprints.data ?? []).map((s) => ({
+      id: `s:${s.id}`,
+      label: s.name as string,
+      type: "sprint" as const,
+      weight: degree.get(`s:${s.id}`) ?? 0,
+      color: SPRINT_COLOR,
+      created_at: s.created_at as string,
     })),
   ];
 

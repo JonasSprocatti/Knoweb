@@ -1,18 +1,23 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { normalizeTasks, PRIORITY, QuickTask, TASK_COLUMNS, TaskBoard, TaskList, today } from "@/components/Work";
+import { Calendar, normalizeTasks, PRIORITY, QuickTask, TASK_COLUMNS, TaskBoard, TaskList, today } from "@/components/Work";
 
 export const metadata = { title: "Tarefas" };
 export const dynamic = "force-dynamic";
 
-type Search = { estado?: string; pessoa?: string; projeto?: string; prioridade?: string; visao?: string };
+type Search = { estado?: string; pessoa?: string; projeto?: string; prioridade?: string; visao?: string; mes?: string; sprint?: string };
 
 const STATES: Record<string, string> = { abertas: "Abertas", atrasadas: "Atrasadas", sugeridas: "Sugeridas", feitas: "Feitas", todas: "Todas" };
 const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink focus:border-accent focus:outline-none";
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams;
-  const { estado = "abertas", pessoa = "", projeto = "", prioridade = "", visao = "lista" } = sp;
+  const { visao = "lista", pessoa = "", projeto = "", prioridade = "", sprint = "" } = sp;
+  const calendar = visao === "calendario";
+  const estado = sp.estado ?? (calendar ? "todas" : "abertas");
+  const mes = /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.mes ?? "") ? sp.mes! : today().slice(0, 7);
+  const [y, m] = mes.split("-").map(Number);
+  const nextMonth = new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
   const supabase = await supabaseServer();
 
   // Filtro por pessoa: !inner faz a junção virar filtro
@@ -26,11 +31,16 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   if (projeto === "nenhum") q = q.is("project_id", null);
   else if (projeto) q = q.eq("project_id", projeto);
   if (prioridade) q = q.eq("priority", prioridade);
+  if (sprint) q = q.eq("sprint_id", sprint);
+  if (calendar) q = q.gte("due_date", `${mes}-01`).lt("due_date", nextMonth);
 
-  const [{ data, error }, { data: people }, { data: projects }] = await Promise.all([
+  const [{ data, error }, { data: people }, { data: projects }, { data: dueProjects }] = await Promise.all([
     q,
     supabase.from("people").select("id, name").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived,suggested)").order("name"),
+    calendar
+      ? supabase.from("projects").select("id, name, slug, emoji, color, due_date").gte("due_date", `${mes}-01`).lt("due_date", nextMonth).not("status", "in", "(archived,suggested)")
+      : Promise.resolve({ data: [] }),
   ]);
   const tasks = normalizeTasks(data as unknown[] | null);
   const href = (patch: Partial<Search>) => `/tasks?${new URLSearchParams(Object.entries({ ...sp, ...patch }).filter(([, v]) => v) as [string, string][])}`;
@@ -46,6 +56,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
           {[
             ["lista", "Lista"],
             ["quadro", "Quadro"],
+            ["calendario", "Calendário"],
           ].map(([k, label]) => (
             <Link key={k} href={href({ visao: k })} className={`rounded px-3 py-1 ${visao === k ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}>
               {label}
@@ -65,6 +76,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         <form className="ml-auto flex flex-wrap gap-2">
           <input type="hidden" name="estado" value={estado} />
           <input type="hidden" name="visao" value={visao} />
+          {calendar && <input type="hidden" name="mes" value={mes} />}
           <select name="pessoa" defaultValue={pessoa} aria-label="Pessoa" className={input}>
             <option value="">Todas as pessoas</option>
             {(people ?? []).map((p) => (
@@ -89,7 +101,9 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       </div>
 
       {error && <p className="text-sm text-rec">{error.message}</p>}
-      {visao === "quadro" ? <TaskBoard tasks={tasks} showProject /> : <TaskList tasks={tasks} showProject empty="Nenhuma tarefa com esses filtros." />}
+      {calendar ? (
+        <Calendar month={mes} tasks={tasks} projects={dueProjects ?? []} hrefFor={(m) => href({ mes: m, estado })} />
+      ) : visao === "quadro" ? <TaskBoard tasks={tasks} showProject /> : <TaskList tasks={tasks} showProject empty="Nenhuma tarefa com esses filtros." />}
     </div>
   );
 }

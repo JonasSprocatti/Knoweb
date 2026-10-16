@@ -69,6 +69,7 @@ export default async function HomePage() {
         {[
           ["/projects", "Projetos"],
           ["/tasks", "Tarefas"],
+          ["/sprints", "Sprints"],
           ["/people", "Pessoas"],
           ["/topics", "Temas"],
           ["/ask", "Perguntar"],

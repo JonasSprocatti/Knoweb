@@ -5,6 +5,8 @@ import { NoteCard } from "@/components/NoteCard";
 import { CoverPicker } from "@/components/CoverPicker";
 import { topicColor } from "@/lib/topicColor";
 import type { NoteListItem } from "@/lib/types";
+import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
+import { deleteTopic } from "@/lib/work-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,13 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
   }
   const related = [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 12);
 
+  // Para a janela de exclusão: notas que só têm este tema e os outros temas (destino)
+  const withOthers = new Set(
+    notes.filter((n) => (n.note_topics ?? []).some((nt) => (nt.topics as { slug?: string } | null)?.slug !== topic.slug)).map((n) => n.id),
+  );
+  const exclusive = notes.filter((n) => !withOthers.has(n.id)).length;
+  const { data: otherTopics } = await supabase.from("topics").select("id, name").neq("id", topic.id).order("name");
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -71,9 +80,31 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
         ))}
       </div>
 
-      <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="self-start rounded-md bg-accent px-4 py-2 font-semibold text-on-accent hover:brightness-110">
-        Perguntar ao Claude sobre este tema
-      </Link>
+      <div className="flex flex-wrap items-center gap-4">
+        <Link href={`/ask?q=${encodeURIComponent(`O que eu sei sobre ${topic.name}? Resuma os pontos principais.`)}`} className="rounded-md bg-accent px-4 py-2 font-semibold text-on-accent hover:brightness-110">
+          Perguntar ao Claude sobre este tema
+        </Link>
+        <ConfirmDelete action={deleteTopic.bind(null, topic.id)} title={`Excluir o tema “${topic.name}”?`} label="Excluir tema">
+          <p className="text-muted">
+            {notes.length === 0 ? "Nenhuma nota usa este tema." : `${notes.length} ${notes.length === 1 ? "nota usa" : "notas usam"} este tema. O que fazer com elas?`}
+          </p>
+          <DeleteOption value="keep" defaultChecked label="Excluir só o tema e manter as notas" hint="As notas continuam, só perdem este tema." />
+          {notes.length > 0 && (otherTopics ?? []).length > 0 && (
+            <DeleteOption value="move" label="Mover as notas para outro tema" hint="Junta este tema em outro.">
+              <select name="target" aria-label="Tema de destino" defaultValue="" className="rounded-md border border-line bg-panel px-2 py-1 text-sm">
+                <option value="">Escolha o tema…</option>
+                {(otherTopics ?? []).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </DeleteOption>
+          )}
+          {exclusive > 0 && exclusive < notes.length && (
+            <DeleteOption value="exclusive" label={`Excluir o tema e as ${exclusive} notas que só têm ele`} hint="Notas que também têm outros temas ficam." />
+          )}
+          {notes.length > 0 && <DeleteOption value="all" label={`Excluir o tema e todas as ${notes.length} notas`} hint="Inclui os áudios delas." />}
+        </ConfirmDelete>
+      </div>
     </div>
   );
 }

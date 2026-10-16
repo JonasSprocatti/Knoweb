@@ -10,15 +10,16 @@ export const dynamic = "force-dynamic";
 const ORDER: ProjectStatus[] = ["active", "idea", "paused", "done", "archived"];
 const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
 
-export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
-  const { visao = "lista" } = await searchParams;
+export default async function ProjectsPage({ searchParams }: { searchParams: Promise<{ visao?: string; modelo?: string }> }) {
+  const { visao = "lista", modelo = "" } = await searchParams;
   const supabase = await supabaseServer();
-  const [{ data }, { data: people }] = await Promise.all([
+  const [{ data }, { data: people }, { data: templates }] = await Promise.all([
     supabase
       .from("projects")
       .select("*, owner:people!projects_owner_id_fkey(name, slug), origin:notes!projects_origin_note_id_fkey(id, title), tasks(status, due_date, task_assignees(person_id)), project_notes(count)")
       .order("updated_at", { ascending: false }),
     supabase.from("people").select("id, name").order("name"),
+    supabase.from("templates").select("id, name, emoji").order("name"),
   ]);
 
   const projects = (data ?? []).map((p) => {
@@ -57,8 +58,11 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         </nav>
       </header>
 
-      <details className="rounded-lg border border-line bg-panel p-4">
-        <summary className="cursor-pointer font-semibold">+ Novo projeto</summary>
+      <details className="rounded-lg border border-line bg-panel p-4" open={!!modelo}>
+        <summary className="cursor-pointer font-semibold">
+          + Novo projeto{" "}
+          <Link href="/templates" className="ml-2 text-sm font-normal text-muted hover:text-ink hover:underline">Modelos</Link>
+        </summary>
         <form action={saveProject} className="mt-3 grid gap-2 sm:grid-cols-[4rem_1fr]">
           <input name="emoji" placeholder="🚀" aria-label="Emoji" className={input} />
           <input name="name" required placeholder="Nome do projeto" aria-label="Nome" className={input} />
@@ -70,6 +74,12 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
               <option value="">Sem responsável</option>
               {(people ?? []).map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select name="template_id" aria-label="Modelo" className={input} defaultValue={modelo}>
+              <option value="">Sem modelo</option>
+              {(templates ?? []).map((t) => (
+                <option key={t.id} value={t.id}>{t.emoji} {t.name}</option>
               ))}
             </select>
             <select name="status" aria-label="Status" className={input} defaultValue="active">
@@ -105,7 +115,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <form action={setProjectStatus.bind(null, p.id, "active")}>
                     <button className="rounded-md bg-accent px-3 py-1 text-sm font-semibold text-on-accent hover:brightness-110">Criar projeto</button>
                   </form>
-                  <form action={deleteProject.bind(null, p.id)}>
+                  <form action={deleteProject.bind(null, p.id, null)}>
                     <button className="rounded-md px-3 py-1 text-sm text-muted hover:text-ink">Descartar</button>
                   </form>
                 </div>

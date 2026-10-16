@@ -282,10 +282,16 @@ function executivo(dark: boolean): GraphTheme {
       ctx.globalAlpha = lit ? 1 : 0.25;
       const x = n.x ?? 0;
       const y = n.y ?? 0;
-      // Forma diz o tipo: tarefa quadrada, projeto losango, pessoa anel, nota círculo
+      // Forma diz o tipo: tarefa quadrada, projeto losango, sprint triângulo, pessoa anel, nota círculo
       if (n.type === "task") {
         ctx.beginPath();
         ctx.roundRect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7, r * 0.3);
+      } else if (n.type === "sprint") {
+        ctx.beginPath();
+        ctx.moveTo(x, y - r * 1.15);
+        ctx.lineTo(x + r, y + r * 0.7);
+        ctx.lineTo(x - r, y + r * 0.7);
+        ctx.closePath();
       } else if (n.type === "project") {
         ctx.beginPath();
         ctx.moveTo(x, y - r * 1.25);

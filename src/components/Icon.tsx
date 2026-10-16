@@ -17,6 +17,7 @@ const PATHS: Record<string, string> = {
   folder: "M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z",
   check: "M4 5h16v14H4zM8 12l3 3 5-6",
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
+  sprint: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2",
   wave: "M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1",
 };
 

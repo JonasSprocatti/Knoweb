@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { addComment, addDependency, deleteTask, logTime, removeDependency, saveTask } from "@/lib/work-actions";
+import { addComment, addDependency, deleteComment, deleteTask, logTime, removeDependency, saveTask } from "@/lib/work-actions";
 import {
   cycleDays,
   days,
@@ -11,6 +11,7 @@ import {
   one,
   PRIORITY,
   projectColor,
+  RECURRENCE,
   QuickTask,
   StatusDot,
   TASK_COLUMNS,
@@ -19,6 +20,7 @@ import {
   TaskList,
 } from "@/components/Work";
 import { relativeDate } from "@/lib/text";
+import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
 import type { TaskStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +49,10 @@ function describe(e: { kind: string; old_value: string | null; new_value: string
       return `Tempo gasto: ${hours(Number(e.old_value ?? 0))} → ${hours(Number(e.new_value ?? 0))}`;
     case "title":
       return `Renomeada de “${e.old_value}”`;
+    case "sprint":
+      return `Sprint: ${e.old_value ?? "backlog"} → ${e.new_value ?? "backlog"}`;
+    case "recurred":
+      return `Concluída; a próxima repetição é ${e.new_value}`;
     case "assigned":
       return `${e.new_value} entrou como responsável`;
     case "unassigned":
@@ -77,13 +83,14 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const note = one(row.notes as { id: string; title: string } | null);
   const parent = one(row.parent as { id: string; number: number; title: string } | null);
 
-  const [{ data: subs }, { data: events }, { data: blockedBy }, { data: blocks }, { data: people }, { data: projects }] = await Promise.all([
+  const [{ data: subs }, { data: events }, { data: blockedBy }, { data: blocks }, { data: people }, { data: projects }, { data: sprints }] = await Promise.all([
     supabase.from("tasks").select(TASK_COLUMNS).eq("parent_id", id).order("created_at"),
     supabase.from("task_events").select("id, kind, old_value, new_value, created_at").eq("task_id", id).order("created_at", { ascending: false }),
     supabase.from("task_dependencies").select("tasks!task_dependencies_blocked_by_fkey(id, number, title, status)").eq("task_id", id),
     supabase.from("task_dependencies").select("tasks!task_dependencies_task_id_fkey(id, number, title, status)").eq("blocked_by", id),
     supabase.from("people").select("id, name").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
+    supabase.from("sprints").select("id, name, end_date").order("start_date", { ascending: false }).limit(20),
   ]);
 
   type Dep = { id: string; number: number; title: string; status: TaskStatus };
@@ -153,6 +160,22 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             <Field label="Prazo">
               <input type="date" name="due_date" defaultValue={task.due_date ?? ""} className={input} />
             </Field>
+            <Field label="Sprint">
+              <select name="sprint_id" defaultValue={task.sprint_id ?? ""} className={input}>
+                <option value="">Backlog (sem sprint)</option>
+                {(sprints ?? []).map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Repetir">
+              <select name="recurrence" defaultValue={task.recurrence ?? ""} className={input}>
+                <option value="">Não repete</option>
+                {Object.entries(RECURRENCE).map(([k, v]) => (
+                  <option key={k} value={k}>↻ {v}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="Estimativa (h)">
               <input name="estimate_hours" inputMode="decimal" defaultValue={task.estimate_hours ?? ""} className={input} />
             </Field>
@@ -194,6 +217,11 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
                 <span className={`absolute -left-[1.3rem] top-3 h-2 w-2 rounded-full ${e.kind === "comment" ? "bg-accent" : "bg-line"}`} aria-hidden />
                 {e.kind === "comment" ? <p className="whitespace-pre-wrap text-ink">{e.new_value}</p> : <span className="text-muted">{describe(e)}</span>}
                 <span className="ml-2 text-xs text-faint">{relativeDate(e.created_at)}</span>
+                {e.kind === "comment" && (
+                  <span className="ml-2 inline-block">
+                    <ConfirmDelete action={deleteComment.bind(null, e.id)} title="Excluir este comentário?" label="excluir" className="text-xs text-faint hover:text-rec" />
+                  </span>
+                )}
               </li>
             ))}
           </ol>
@@ -246,9 +274,20 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           </section>
         )}
 
-        <form action={deleteTask.bind(null, task.id, task.projects ? `/projects/${task.projects.slug}` : "/tasks")}>
-          <button className="text-rec hover:underline">Apagar tarefa</button>
-        </form>
+        <ConfirmDelete
+          action={deleteTask.bind(null, task.id, parent ? `/tasks/${parent.id}` : task.projects ? `/projects/${task.projects.slug}` : "/tasks")}
+          title={`Excluir ${taskCode(task.number)} “${task.title}”?`}
+          label="Excluir tarefa"
+        >
+          {subtasks.length > 0 ? (
+            <>
+              <DeleteOption name="subtasks" value="keep" defaultChecked label={`Manter as ${subtasks.length} subtarefas`} hint="Viram tarefas soltas, no mesmo projeto." />
+              <DeleteOption name="subtasks" value="delete" label="Excluir as subtarefas junto" />
+            </>
+          ) : (
+            <p className="text-muted">O histórico e os comentários dela também somem.</p>
+          )}
+        </ConfirmDelete>
       </aside>
     </div>
   );

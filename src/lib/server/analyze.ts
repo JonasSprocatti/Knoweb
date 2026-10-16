@@ -18,6 +18,7 @@ interface AnalysisResult {
     project?: string | null;
     priority?: string | null;
     estimate_hours?: number | null;
+    recurrence?: string | null;
   }[];
   decisions: string[];
   people: string[];
@@ -56,6 +57,7 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
             project: { type: ["string", "null"], description: "Nome exato do projeto (existente ou sugerido em projects) a que a tarefa pertence." },
             priority: { type: ["string", "null"], description: "low, medium, high ou urgent, pelo tom da conversa." },
             estimate_hours: { type: ["number", "null"], description: "Estimativa de horas para fazer, só se der para inferir com alguma base." },
+            recurrence: { type: ["string", "null"], description: "Só se a tarefa se repete: daily, weekdays, weekly, biweekly ou monthly." },
           },
           required: ["text"],
         },
@@ -290,6 +292,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
 type Row = { id: string; name: string; slug: string };
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
+const RECURRENCES = new Set(["daily", "weekdays", "weekly", "biweekly", "monthly"]);
 
 /** Cria o que faltar (sem tocar no que já existe) e devolve id por slug. */
 async function ensure(
@@ -381,6 +384,7 @@ async function linkWork(supabase: SupabaseClient, noteId: string, result: Analys
         priority: PRIORITIES.has(a.priority ?? "") ? a.priority : "medium",
         due_date: ISO_DATE.test(a.due_date ?? "") ? a.due_date : null,
         estimate_hours: Number(a.estimate_hours) > 0 ? Number(a.estimate_hours) : null,
+        recurrence: RECURRENCES.has(a.recurrence ?? "") ? a.recurrence : null,
       })),
     )
     .select("id");

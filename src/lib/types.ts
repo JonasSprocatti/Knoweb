@@ -3,7 +3,7 @@ export type NoteStatus = "ready" | "recording" | "transcribing" | "analyzing" | 
 
 export interface Insights {
   key_points?: string[];
-  action_items?: { text: string; owner?: string | null; due?: string | null; assignees?: string[]; project?: string | null }[];
+  action_items?: { text: string; owner?: string | null; due?: string | null; assignees?: string[]; project?: string | null; recurrence?: string | null }[];
   decisions?: string[];
   people?: string[];
   questions?: string[];
@@ -63,7 +63,7 @@ export interface TopicWithCount extends Topic {
 export interface GraphNode {
   id: string;
   label: string;
-  type: "note" | "recording" | "topic" | "project" | "task" | "person";
+  type: "note" | "recording" | "topic" | "project" | "task" | "person" | "sprint";
   weight: number;
   slug?: string;
   /** Cor do tema (ou do tema principal da nota) */
@@ -77,7 +77,7 @@ export interface GraphNode {
 export interface GraphLink {
   source: string;
   target: string;
-  kind: "topic" | "wikilink" | "ai" | "project" | "task" | "assignee" | "mention";
+  kind: "topic" | "wikilink" | "ai" | "project" | "task" | "assignee" | "mention" | "sprint";
 }
 
 export type ProjectStatus = "suggested" | "idea" | "active" | "paused" | "done" | "archived";
@@ -125,7 +125,37 @@ export interface Task {
   started_at: string | null;
   completed_at: string | null;
   source: "ai" | "manual";
+  sprint_id: string | null;
+  recurrence: Recurrence | null;
   created_at: string;
+}
+
+export type Recurrence = "daily" | "weekdays" | "weekly" | "biweekly" | "monthly";
+
+export interface Sprint {
+  id: string;
+  name: string;
+  goal: string | null;
+  start_date: string;
+  end_date: string;
+}
+
+export interface TemplateTask {
+  title: string;
+  description?: string;
+  priority?: TaskPriority;
+  estimate_hours?: number | null;
+  /** Dias depois do início do projeto */
+  offset_days?: number | null;
+  recurrence?: Recurrence | null;
+}
+
+export interface Template {
+  id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+  tasks: TemplateTask[];
 }
 
 /** Tarefa com projeto e responsáveis já juntados (o que as listas mostram). */

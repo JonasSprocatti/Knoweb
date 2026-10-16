@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { acceptSuggested, deleteProject, saveProject, setProjectStatus } from "@/lib/work-actions";
+import { acceptSuggested, deleteProject, removeMention, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -10,13 +10,13 @@ export async function NoteWork({ supabase, noteId }: { supabase: SupabaseClient;
   const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }] = await Promise.all([
     supabase.from("project_notes").select("projects(id, name, slug, emoji, color, status, reason)").eq("note_id", noteId),
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
-    supabase.from("note_people").select("people(name, slug)").eq("note_id", noteId),
+    supabase.from("note_people").select("people(id, name, slug)").eq("note_id", noteId),
     supabase.from("people").select("id, name").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
   ]);
   const linked = (pn ?? []).map((r) => one(r.projects as unknown as P | null)).filter((p): p is P => !!p);
   const tasks = normalizeTasks(taskRows);
-  const mentioned = (np ?? []).map((r) => one(r.people as unknown as { name: string; slug: string } | null)).filter((p) => !!p);
+  const mentioned = (np ?? []).map((r) => one(r.people as unknown as { id: string; name: string; slug: string } | null)).filter((p) => !!p);
   const suggestedCount = tasks.filter((t) => t.status === "suggested").length;
 
   return (
@@ -37,7 +37,7 @@ export async function NoteWork({ supabase, noteId }: { supabase: SupabaseClient;
                     <form action={setProjectStatus.bind(null, p.id, "active")}>
                       <button className="rounded bg-accent px-2.5 py-0.5 text-xs font-semibold text-on-accent">Criar</button>
                     </form>
-                    <form action={deleteProject.bind(null, p.id)}>
+                    <form action={deleteProject.bind(null, p.id, null)}>
                       <button className="px-2 py-0.5 text-xs text-muted hover:text-ink">Descartar</button>
                     </form>
                   </div>
@@ -81,9 +81,12 @@ export async function NoteWork({ supabase, noteId }: { supabase: SupabaseClient;
           <h2 className="mb-2 text-base font-semibold">Pessoas</h2>
           <div className="flex flex-wrap gap-1.5">
             {mentioned.map((p) => (
-              <Link key={p!.slug} href={`/people/${p!.slug}`} className="rounded-md border border-line bg-panel px-2.5 py-0.5 text-sm text-ink hover:border-accent">
-                {p!.name}
-              </Link>
+              <span key={p!.slug} className="inline-flex items-center gap-1 rounded-md border border-line bg-panel py-0.5 pl-2.5 pr-1 text-sm">
+                <Link href={`/people/${p!.slug}`} className="text-ink hover:underline">{p!.name}</Link>
+                <form action={removeMention.bind(null, noteId, p!.id)}>
+                  <button className="px-1 text-faint hover:text-ink" aria-label={`Tirar ${p!.name} desta nota`} title="Tirar desta nota">×</button>
+                </form>
+              </span>
             ))}
           </div>
         </section>

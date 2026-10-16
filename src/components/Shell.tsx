@@ -12,6 +12,7 @@ const NAV = [
   { href: "/notes", label: "Notas", icon: "notes" },
   { href: "/projects", label: "Projetos", icon: "folder" },
   { href: "/tasks", label: "Tarefas", icon: "check" },
+  { href: "/sprints", label: "Sprints", icon: "sprint" },
   { href: "/people", label: "Pessoas", icon: "user" },
   { href: "/topics", label: "Temas", icon: "tag" },
   { href: "/graph", label: "Teia", icon: "graph" },

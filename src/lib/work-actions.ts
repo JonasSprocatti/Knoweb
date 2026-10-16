@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/supabase/server";
+import { deleteNotes } from "@/lib/server/deleteNotes";
 import { slugify } from "@/lib/text";
+import type { TemplateTask } from "@/lib/types";
 
 /** Projetos, tarefas e pessoas: ações chamadas direto dos formulários. */
 
@@ -68,12 +70,44 @@ export async function saveProject(form: FormData) {
     ? must(await supabase.from("projects").update(row).eq("id", id).select("slug").single())
     : must(await supabase.from("projects").insert(row).select("slug").single());
   const noteId = str(form, "note_id");
-  if (noteId && !id) {
+  const templateId = str(form, "template_id");
+  if (!id && (noteId || templateId)) {
     const { data: p } = await supabase.from("projects").select("id").eq("slug", saved.slug).single();
-    if (p) await supabase.from("project_notes").upsert({ project_id: p.id, note_id: noteId, relevance: 1, source: "manual" });
+    if (p && noteId) await supabase.from("project_notes").upsert({ project_id: p.id, note_id: noteId, relevance: 1, source: "manual" });
+    if (p && templateId) await applyTemplate(supabase, templateId, p.id, row.start_date);
   }
   refresh();
   redirect(`/projects/${saved.slug}`);
+}
+
+/** Cria as tarefas do modelo no projeto; o prazo conta a partir do início. */
+async function applyTemplate(supabase: SupabaseClient, templateId: string, projectId: string, start: string | null) {
+  const { data: tpl } = await supabase.from("templates").select("description, emoji, tasks").eq("id", templateId).single();
+  if (!tpl) return;
+  const base = new Date(`${start ?? new Date().toISOString().slice(0, 10)}T12:00:00Z`);
+  const due = (offset?: number | null) =>
+    offset == null ? null : new Date(base.getTime() + offset * 86_400_000).toISOString().slice(0, 10);
+  const items = (tpl.tasks ?? []) as TemplateTask[];
+  if (items.length)
+    must(
+      await supabase.from("tasks").insert(
+        items.map((t) => ({
+          project_id: projectId,
+          title: t.title,
+          description: t.description ?? "",
+          priority: t.priority ?? "medium",
+          estimate_hours: t.estimate_hours ?? null,
+          recurrence: t.recurrence ?? null,
+          due_date: due(t.offset_days),
+        })),
+      ),
+    );
+  // Descrição e emoji do modelo só entram se o projeto não tiver os seus
+  const { data: p } = await supabase.from("projects").select("description, emoji").eq("id", projectId).single();
+  await supabase
+    .from("projects")
+    .update({ description: p?.description || tpl.description, emoji: p?.emoji || tpl.emoji })
+    .eq("id", projectId);
 }
 
 export async function setProjectStatus(id: string, status: string) {
@@ -84,13 +118,21 @@ export async function setProjectStatus(id: string, status: string) {
   refresh();
 }
 
-export async function deleteProject(id: string, back?: unknown) {
+/**
+ * Exclui o projeto. Sugestões dele sempre vão junto; o resto depende da escolha:
+ * tasks = keep (ficam sem projeto) | delete; notes = keep | delete (as ligadas a ele).
+ */
+export async function deleteProject(id: string, back: string | null, form?: FormData) {
   const supabase = await db();
-  // Tarefas sugeridas para um projeto descartado não fazem sentido sozinhas
   await supabase.from("tasks").delete().eq("project_id", id).eq("status", "suggested");
+  if (form?.get("tasks") === "delete") must(await supabase.from("tasks").delete().eq("project_id", id));
+  if (form?.get("notes") === "delete") {
+    const { data } = await supabase.from("project_notes").select("note_id").eq("project_id", id);
+    await deleteNotes(supabase, (data ?? []).map((r) => r.note_id as string));
+  }
   must(await supabase.from("projects").delete().eq("id", id));
   refresh();
-  if (typeof back === "string") redirect(back);
+  if (back) redirect(back);
 }
 
 export async function linkNote(projectId: string, form: FormData) {
@@ -125,6 +167,8 @@ export async function saveTask(form: FormData) {
   // Campos que só o formulário completo tem; o rápido não apaga o que já existe
   if (form.has("description")) row.description = str(form, "description") ?? "";
   if (form.has("spent_hours")) row.spent_hours = num(form, "spent_hours") ?? 0;
+  if (form.has("sprint_id")) row.sprint_id = str(form, "sprint_id");
+  if (form.has("recurrence")) row.recurrence = str(form, "recurrence");
   if (!id) {
     row.parent_id = str(form, "parent_id");
     row.note_id = str(form, "note_id");
@@ -165,11 +209,19 @@ export async function acceptSuggested(by: "note_id" | "project_id", id: string) 
   refresh();
 }
 
-export async function deleteTask(id: string, back?: unknown) {
+/** Exclui a tarefa; subtarefas vão junto ou viram tarefas soltas (subtasks = keep). */
+export async function deleteTask(id: string, back: string | null, form?: FormData) {
   const supabase = await db();
+  if (form?.get("subtasks") === "keep") must(await supabase.from("tasks").update({ parent_id: null }).eq("parent_id", id));
   must(await supabase.from("tasks").delete().eq("id", id));
   refresh();
-  if (typeof back === "string") redirect(back);
+  if (back) redirect(back);
+}
+
+export async function deleteComment(eventId: string, _form?: FormData) {
+  const supabase = await db();
+  must(await supabase.from("task_events").delete().eq("id", eventId).eq("kind", "comment"));
+  refresh();
 }
 
 export async function logTime(id: string, form: FormData) {
@@ -227,9 +279,200 @@ export async function savePerson(form: FormData) {
   redirect(`/people/${saved.slug}`);
 }
 
-export async function deletePerson(id: string) {
+/** Exclui a pessoa; tasks = keep (ficam sem ela) | delete (as que só ela fazia). */
+export async function deletePerson(id: string, form?: FormData) {
   const supabase = await db();
+  if (form?.get("tasks") === "delete") {
+    const { data: mine } = await supabase.from("task_assignees").select("task_id").eq("person_id", id);
+    const ids = (mine ?? []).map((r) => r.task_id as string);
+    const { data: shared } = ids.length
+      ? await supabase.from("task_assignees").select("task_id").in("task_id", ids).neq("person_id", id)
+      : { data: [] };
+    const others = new Set((shared ?? []).map((r) => r.task_id as string));
+    const only = ids.filter((t) => !others.has(t));
+    if (only.length) must(await supabase.from("tasks").delete().in("id", only));
+  }
   must(await supabase.from("people").delete().eq("id", id));
   refresh();
   redirect("/people");
+}
+
+// ---------------------------------------------------------------- Sprints
+
+export async function saveSprint(form: FormData) {
+  const supabase = await db();
+  const id = str(form, "id");
+  const row = { name: str(form, "name"), goal: str(form, "goal"), start_date: str(form, "start_date"), end_date: str(form, "end_date") };
+  if (!row.name || !row.start_date || !row.end_date) throw new Error("Nome, início e fim são obrigatórios.");
+  const saved = id
+    ? must(await supabase.from("sprints").update(row).eq("id", id).select("id").single())
+    : must(await supabase.from("sprints").insert(row).select("id").single());
+  refresh();
+  redirect(`/sprints/${saved.id}`);
+}
+
+/** Exclui a sprint; tasks = keep (voltam ao backlog) | delete. */
+export async function deleteSprint(id: string, form?: FormData) {
+  const supabase = await db();
+  if (form?.get("tasks") === "delete") must(await supabase.from("tasks").delete().eq("sprint_id", id));
+  must(await supabase.from("sprints").delete().eq("id", id));
+  refresh();
+  redirect("/sprints");
+}
+
+/** Põe (ou tira, com null) a tarefa da sprint. */
+export async function moveToSprint(taskId: string, sprintId: string | null) {
+  const supabase = await db();
+  must(await supabase.from("tasks").update({ sprint_id: sprintId }).eq("id", taskId));
+  refresh();
+}
+
+/** Encerra a sprint: o que não terminou vai para a próxima (ou volta ao backlog). */
+export async function completeSprint(id: string) {
+  const supabase = await db();
+  const { data: sprint } = await supabase.from("sprints").select("end_date").eq("id", id).single();
+  const { data: next } = await supabase
+    .from("sprints")
+    .select("id")
+    .gt("start_date", sprint?.end_date ?? "1970-01-01")
+    .order("start_date")
+    .limit(1)
+    .maybeSingle();
+  must(
+    await supabase
+      .from("tasks")
+      .update({ sprint_id: next?.id ?? null })
+      .eq("sprint_id", id)
+      .in("status", ["suggested", "todo", "doing", "blocked"]),
+  );
+  refresh();
+  redirect(next ? `/sprints/${next.id}` : "/sprints");
+}
+
+// ---------------------------------------------------------------- Modelos
+
+/** Uma tarefa por linha: "Título ; dias depois do início ; horas". */
+function parseTemplateTasks(text: string): TemplateTask[] {
+  return text
+    .split("\n")
+    .map((line) => line.split(";").map((p) => p.trim()))
+    .filter(([title]) => title)
+    .map(([title, offset, h]) => ({
+      title,
+      offset_days: offset && Number.isFinite(Number(offset)) ? Number(offset) : null,
+      estimate_hours: h && Number(h.replace(",", ".")) > 0 ? Number(h.replace(",", ".")) : null,
+    }));
+}
+
+export async function saveTemplate(form: FormData) {
+  const supabase = await db();
+  const id = str(form, "id");
+  const name = str(form, "name");
+  if (!name) throw new Error("Dê um nome ao modelo.");
+  const row = {
+    name,
+    emoji: str(form, "emoji")?.slice(0, 8) ?? null,
+    description: str(form, "description"),
+    tasks: parseTemplateTasks(str(form, "tasks") ?? ""),
+  };
+  must(id ? await supabase.from("templates").update(row).eq("id", id) : await supabase.from("templates").insert(row));
+  refresh();
+  redirect("/templates");
+}
+
+/** Salva um projeto existente como modelo (tarefas com prazo relativo ao início). */
+export async function templateFromProject(projectId: string) {
+  const supabase = await db();
+  const { data: p } = await supabase.from("projects").select("name, emoji, description, start_date, created_at").eq("id", projectId).single();
+  if (!p) throw new Error("Projeto não encontrado.");
+  const { data: tasks } = await supabase
+    .from("tasks")
+    .select("title, description, priority, estimate_hours, due_date, recurrence")
+    .eq("project_id", projectId)
+    .is("parent_id", null)
+    .not("status", "in", "(suggested,canceled)")
+    .order("due_date", { ascending: true, nullsFirst: false });
+  const start = new Date(`${p.start_date ?? String(p.created_at).slice(0, 10)}T12:00:00Z`).getTime();
+  must(
+    await supabase.from("templates").insert({
+      name: p.name,
+      emoji: p.emoji,
+      description: p.description,
+      tasks: (tasks ?? []).map((t) => ({
+        title: t.title,
+        description: t.description || undefined,
+        priority: t.priority,
+        estimate_hours: t.estimate_hours,
+        recurrence: t.recurrence,
+        offset_days: t.due_date ? Math.max(0, Math.round((new Date(`${t.due_date}T12:00:00Z`).getTime() - start) / 86_400_000)) : null,
+      })),
+    }),
+  );
+  refresh();
+  redirect("/templates");
+}
+
+export async function deleteTemplate(id: string, _form?: FormData) {
+  const supabase = await db();
+  must(await supabase.from("templates").delete().eq("id", id));
+  refresh();
+}
+
+// ---------------------------------------------------------------- Temas e notas
+
+/**
+ * Exclui o tema. mode:
+ *  keep      — só o tema; as notas ficam
+ *  move      — as notas passam para o tema "target" antes
+ *  exclusive — apaga também as notas que só tinham este tema
+ *  all       — apaga também todas as notas deste tema
+ */
+export async function deleteTopic(id: string, form: FormData) {
+  const supabase = await db();
+  const mode = str(form, "mode") ?? "keep";
+  const { data: topic } = await supabase.from("topics").select("cover_path").eq("id", id).single();
+  const { data: rows } = await supabase.from("note_topics").select("note_id, relevance").eq("topic_id", id);
+  const noteIds = (rows ?? []).map((r) => r.note_id as string);
+
+  if (mode === "move") {
+    const target = str(form, "target");
+    if (!target || target === id) throw new Error("Escolha o tema que vai receber as notas.");
+    if (rows?.length)
+      must(
+        await supabase
+          .from("note_topics")
+          .upsert(rows.map((r) => ({ note_id: r.note_id, topic_id: target, relevance: r.relevance, source: "manual" })), {
+            onConflict: "note_id,topic_id",
+            ignoreDuplicates: true,
+          }),
+      );
+  }
+  if (mode === "all") await deleteNotes(supabase, noteIds);
+  if (mode === "exclusive" && noteIds.length) {
+    const { data: other } = await supabase.from("note_topics").select("note_id").in("note_id", noteIds).neq("topic_id", id);
+    const keep = new Set((other ?? []).map((r) => r.note_id as string));
+    await deleteNotes(supabase, noteIds.filter((n) => !keep.has(n)));
+  }
+  if (topic?.cover_path) await supabase.storage.from("images").remove([topic.cover_path]);
+  must(await supabase.from("topics").delete().eq("id", id));
+  refresh();
+  redirect("/topics");
+}
+
+/** Exclui a nota; tasks = keep (ficam sem nota) | delete (as que saíram dela). */
+export async function deleteNote(id: string, form: FormData) {
+  const supabase = await db();
+  if (form.get("tasks") === "delete") must(await supabase.from("tasks").delete().eq("note_id", id));
+  else await supabase.from("tasks").delete().eq("note_id", id).eq("status", "suggested");
+  // Projetos que o Claude sugeriu a partir desta nota e ninguém aceitou
+  await supabase.from("projects").delete().eq("origin_note_id", id).eq("status", "suggested");
+  await deleteNotes(supabase, [id]);
+  refresh();
+  redirect("/notes");
+}
+
+export async function removeMention(noteId: string, personId: string) {
+  const supabase = await db();
+  must(await supabase.from("note_people").delete().eq("note_id", noteId).eq("person_id", personId));
+  refresh();
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deleteNotes } from "@/lib/server/deleteNotes";
 import { requireUser } from "@/lib/supabase/server";
 import { syncWikilinks } from "@/lib/server/links";
 import { serverError, unauthorized } from "@/lib/server/http";
@@ -39,11 +40,10 @@ export async function DELETE(_request: Request, { params }: Params) {
   const { supabase, user } = await requireUser();
   if (!user) return unauthorized();
 
-  const { data: segs } = await supabase.from("audio_segments").select("storage_path").eq("note_id", id);
-  const paths = (segs ?? []).map((s) => s.storage_path as string);
-  if (paths.length) await supabase.storage.from("audio").remove(paths);
-
-  const { error } = await supabase.from("notes").delete().eq("id", id);
-  if (error) return serverError(error);
+  try {
+    await deleteNotes(supabase, [id]);
+  } catch (err) {
+    return serverError(err);
+  }
   return NextResponse.json({ ok: true });
 }

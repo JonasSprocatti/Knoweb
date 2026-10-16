@@ -4,6 +4,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { deletePerson, savePerson } from "@/lib/work-actions";
 import { cycleDays, days, formatDay, hours, normalizeTasks, one, Progress, projectColor, PROJECT_STATUS, TASK_COLUMNS, TASK_STATUS, TaskList, taskCode, today } from "@/components/Work";
 import { relativeDate } from "@/lib/text";
+import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
 import type { ProjectStatus, TaskStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -173,9 +174,12 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
             <textarea name="about" defaultValue={person.about ?? ""} rows={3} placeholder="Sobre" aria-label="Sobre" className={input} />
             <button className="rounded-md bg-accent px-3 py-1.5 font-semibold text-on-accent hover:brightness-110">Salvar</button>
           </form>
-          <form action={deletePerson.bind(null, person.id)} className="mt-3">
-            <button className="text-rec hover:underline">Apagar pessoa</button>
-          </form>
+          <div className="mt-3">
+            <ConfirmDelete action={deletePerson.bind(null, person.id)} title={`Excluir ${person.name}?`} label="Excluir pessoa">
+              <DeleteOption name="tasks" value="keep" defaultChecked label="Manter as tarefas" hint="Ela sai das tarefas e das notas; as tarefas ficam." />
+              <DeleteOption name="tasks" value="delete" label="Excluir as tarefas que só ela fazia" hint="Tarefas com outros responsáveis ficam." />
+            </ConfirmDelete>
+          </div>
         </details>
       </aside>
     </div>
