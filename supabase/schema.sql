@@ -621,3 +621,20 @@ create index if not exists note_versions_note_idx on public.note_versions (note_
 alter table public.note_versions enable row level security;
 drop policy if exists "own_rows" on public.note_versions;
 create policy "own_rows" on public.note_versions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Sistemas ligados a projetos, empresas e tarefas (que sistema o projeto
+-- envolve, que sistemas a empresa usa, em que sistema a tarefa é feita).
+-- ---------------------------------------------------------------------
+create table if not exists public.entity_links (
+  entity_id     uuid not null references public.entities(id) on delete cascade,
+  target_type   text not null check (target_type in ('project', 'task', 'company')),
+  target_id     uuid not null,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  source        text not null default 'manual' check (source in ('ai', 'manual')),
+  primary key (entity_id, target_type, target_id)
+);
+create index if not exists entity_links_target_idx on public.entity_links (target_type, target_id);
+alter table public.entity_links enable row level security;
+drop policy if exists "own_rows" on public.entity_links;
+create policy "own_rows" on public.entity_links for all using (user_id = auth.uid()) with check (user_id = auth.uid());

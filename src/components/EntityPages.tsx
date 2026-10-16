@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { SaveButton } from "@/components/SaveButton";
 import { ConfirmDelete } from "@/components/ConfirmDelete";
 import { formatDay } from "@/components/Work";
+import { SystemLinks } from "@/components/SystemLinks";
 import type { Entity, EntityKind } from "@/lib/types";
 
 const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
@@ -116,6 +117,8 @@ export async function EntityDetail({ kind, slug }: { kind: EntityKind; slug: str
       </div>
 
       <aside className="flex flex-col gap-7 text-sm">
+        {kind === "company" && <SystemLinks supabase={supabase} type="company" id={entity.id} title="Sistemas que usa" />}
+        {kind === "system" && <UsedBy supabase={supabase} entityId={entity.id} />}
         {kind === "company" && (
           <section>
             <h2 className="mb-2 text-base font-semibold">Pessoas</h2>
@@ -183,5 +186,40 @@ export async function EntityDetail({ kind, slug }: { kind: EntityKind; slug: str
         </details>
       </aside>
     </div>
+  );
+}
+
+/** Na página de um sistema: projetos, empresas e tarefas a que ele está ligado. */
+async function UsedBy({ supabase, entityId }: { supabase: Awaited<ReturnType<typeof supabaseServer>>; entityId: string }) {
+  const { data: links } = await supabase.from("entity_links").select("target_type, target_id").eq("entity_id", entityId);
+  const ids = (t: string) => (links ?? []).filter((l) => l.target_type === t).map((l) => l.target_id as string);
+  const [{ data: projects }, { data: companies }, { data: tasks }] = await Promise.all([
+    ids("project").length ? supabase.from("projects").select("id, name, slug, emoji").in("id", ids("project")) : Promise.resolve({ data: [] }),
+    ids("company").length ? supabase.from("entities").select("id, name, slug").in("id", ids("company")) : Promise.resolve({ data: [] }),
+    ids("task").length ? supabase.from("tasks").select("id, number, title, status").in("id", ids("task")) : Promise.resolve({ data: [] }),
+  ]);
+  type Row = { id: string; name?: string; slug?: string; emoji?: string | null; number?: number; title?: string };
+  const groups: [string, Row[], (r: Row) => string, (r: Row) => string][] = [
+    ["Projetos", (projects ?? []) as Row[], (r) => `/projects/${r.slug}`, (r) => `${r.emoji ?? ""} ${r.name}`],
+    ["Empresas", (companies ?? []) as Row[], (r) => `/companies/${r.slug}`, (r) => r.name ?? ""],
+    ["Tarefas", (tasks ?? []) as Row[], (r) => `/tasks/${r.id}`, (r) => `T-${r.number} ${r.title}`],
+  ];
+  return (
+    <section>
+      <h2 className="mb-2 text-base font-semibold">Ligado a</h2>
+      {!(links ?? []).length && <p className="text-faint">Nada ainda. Ligue este sistema na página de um projeto, empresa ou tarefa, ou deixe o Claude ligar ao analisar.</p>}
+      {groups.map(([label, rows, href, text]) =>
+        rows.length ? (
+          <div key={label} className="mb-2">
+            <p className="text-xs text-faint">{label}</p>
+            <ul className="flex flex-col gap-0.5">
+              {rows.map((r) => (
+                <li key={r.id}><Link href={href(r)} className="text-ink hover:underline">{text(r)}</Link></li>
+              ))}
+            </ul>
+          </div>
+        ) : null,
+      )}
+    </section>
   );
 }

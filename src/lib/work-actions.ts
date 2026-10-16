@@ -510,6 +510,11 @@ export async function resolvePending(noteId: string, form: FormData) {
       .filter((r) => ents.some((e) => e.kind === r.kind && e.slug === r.slug))
       .map((r) => ({ note_id: noteId, entity_id: r.id as string, source: "ai" }));
     if (links.length) await supabase.from("note_entities").upsert(links, { ignoreDuplicates: true });
+    // Sistemas novos: as ligações que o Claude tinha previsto (tarefas, projetos, empresas)
+    const sysLinks = (rows ?? []).flatMap((r) =>
+      (ents.find((e) => e.kind === r.kind && e.slug === r.slug)?.links ?? []).map((l) => ({ entity_id: r.id as string, target_type: l.type, target_id: l.id, source: "ai" })),
+    );
+    if (sysLinks.length) await supabase.from("entity_links").upsert(sysLinks, { onConflict: "entity_id,target_type,target_id", ignoreDuplicates: true });
   }
 
   if (topics.length) {
@@ -594,4 +599,26 @@ export async function restoreVersion(noteId: string, versionId: string) {
   must(await supabase.from("notes").update({ content: v.content }).eq("id", noteId));
   refresh();
   redirect(`/notes/${noteId}`);
+}
+
+/** Liga um sistema (existente, ou novo pelo nome) a um projeto, tarefa ou empresa. */
+export async function linkSystem(type: "project" | "task" | "company", targetId: string, form: FormData) {
+  const supabase = await db();
+  let entityId = str(form, "entity_id");
+  const name = str(form, "new_name");
+  if (!entityId && name) {
+    const row = must(
+      await supabase.from("entities").upsert({ kind: "system", name, slug: slugify(name) || "sem-nome" }, { onConflict: "user_id,kind,slug" }).select("id").single(),
+    );
+    entityId = row.id as string;
+  }
+  if (!entityId) return;
+  must(await supabase.from("entity_links").upsert({ entity_id: entityId, target_type: type, target_id: targetId, source: "manual" }, { onConflict: "entity_id,target_type,target_id" }));
+  refresh();
+}
+
+export async function unlinkSystem(entityId: string, type: string, targetId: string) {
+  const supabase = await db();
+  must(await supabase.from("entity_links").delete().eq("entity_id", entityId).eq("target_type", type).eq("target_id", targetId));
+  refresh();
 }

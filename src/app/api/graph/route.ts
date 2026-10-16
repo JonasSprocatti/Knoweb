@@ -19,7 +19,7 @@ export async function GET() {
   const { supabase, user } = await requireUser();
   if (!user) return unauthorized();
 
-  const [notes, topics, noteTopics, links, projects, tasks, people, projectNotes, assignees, notePeople, deps, sprints, entities, noteEntities] = await Promise.all([
+  const [notes, topics, noteTopics, links, projects, tasks, people, projectNotes, assignees, notePeople, deps, sprints, entities, noteEntities, entityLinks] = await Promise.all([
     supabase.from("notes").select("id, title, kind, created_at, cover_path").limit(3000),
     supabase.from("topics").select("id, name, slug, color, emoji, cover_path, created_at"),
     supabase.from("note_topics").select("note_id, topic_id, relevance"),
@@ -34,6 +34,7 @@ export async function GET() {
     supabase.from("sprints").select("id, name, created_at"),
     supabase.from("entities").select("id, kind, name, slug, created_at"),
     supabase.from("note_entities").select("note_id, entity_id"),
+    supabase.from("entity_links").select("entity_id, target_type, target_id"),
   ]);
   const err =
     notes.error || topics.error || noteTopics.error || links.error || projects.error || tasks.error ||
@@ -93,6 +94,8 @@ export async function GET() {
   for (const np of notePeople.data ?? []) link(np.note_id, `u:${np.person_id}`, "mention");
   for (const ne of noteEntities.data ?? []) link(ne.note_id, `e:${ne.entity_id}`, "entity");
   for (const p of people.data ?? []) if (p.company_id) link(`u:${p.id}`, `e:${p.company_id}`, "entity");
+  const prefix = { project: "p:", task: "k:", company: "e:" } as const;
+  for (const l of entityLinks.data ?? []) link(`e:${l.entity_id}`, `${prefix[l.target_type as keyof typeof prefix]}${l.target_id}`, "entity");
 
   const projectColorById = new Map((projects.data ?? []).map((p) => [p.id as string, topicColor(p)]));
 

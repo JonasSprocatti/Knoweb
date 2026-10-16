@@ -14,7 +14,7 @@ export interface Insights {
 export interface PendingCreations {
   topics: { name: string; slug: string; description: string; emoji: string | null; relevance: number }[];
   people: { name: string; slug: string; task_ids: string[] }[];
-  entities?: { kind: EntityKind; name: string; slug: string; description: string }[];
+  entities?: { kind: EntityKind; name: string; slug: string; description: string; links?: { type: "project" | "task" | "company"; id: string }[] }[];
 }
 
 export type EntityKind = "company" | "system";

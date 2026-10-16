@@ -224,6 +224,11 @@ export function GraphView() {
     [data, threeD],
   );
 
+  // Só os 4 pontos principais têm nome visível de longe; o resto aparece ao aproximar ou passar o dedo
+  const topHubs = useMemo(
+    () => new Set(data.nodes.filter(isHub).sort((a, b) => b.weight - a.weight).slice(0, 4).map((n) => n.id)),
+    [data],
+  );
   const isLit = (id: string) => !hover || hover === id || !!neighbors.get(hover)?.has(id);
   const openNode = (n: SimNode) => {
     const taskId = n.id.slice(2);
@@ -441,7 +446,7 @@ export function GraphView() {
               }
 
               const isTopicLabel = node.type === "topic" && theme.topicIsLabel;
-              const showLabel = !isTopicLabel && (isHub(node) ? scale > 1.1 || node.weight >= 6 || hover === node.id : scale > 1.6 || hover === node.id || (hover && lit));
+              const showLabel = !isTopicLabel && (isHub(node) ? scale > 1.5 || topHubs.has(node.id) || hover === node.id : scale > 1.6 || hover === node.id || (hover && lit));
               if (showLabel) {
                 const fontSize = (isHub(node) ? 13 : 11) / scale;
                 ctx.font = `${isHub(node) ? 650 : 450} ${fontSize}px ${font}`;
@@ -449,6 +454,11 @@ export function GraphView() {
                 ctx.textBaseline = "top";
                 ctx.fillStyle = isHub(node) ? node.color : theme.label;
                 const label = node.label.length > 40 ? `${node.label.slice(0, 38)}…` : node.label;
+                // Contorno da cor do fundo: o nome continua legível por cima das linhas
+                ctx.lineJoin = "round";
+                ctx.lineWidth = 3.5 / scale;
+                ctx.strokeStyle = theme.bg;
+                ctx.strokeText(label, x, y + r + 3 / scale);
                 ctx.fillText(label, x, y + r + 3 / scale);
               }
               ctx.restore();

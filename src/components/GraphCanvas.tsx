@@ -19,8 +19,8 @@ export default function GraphCanvas({ fgRef, ...props }: { fgRef: MutableRefObje
     if (!fg) return;
     fg.d3Force("x", forceX(0).strength(0.07));
     fg.d3Force("y", forceY(0).strength(0.07));
-    fg.d3Force("charge")?.strength(-70);
-    fg.d3Force("link")?.distance(34);
+    fg.d3Force("charge")?.strength(-140);
+    fg.d3Force("link")?.distance(48);
     fg.d3ReheatSimulation?.();
   }, [fgRef]);
   return <Graph ref={fgRef} {...props} />;

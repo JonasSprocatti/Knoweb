@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -206,6 +207,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </section>
 
         <aside className="flex flex-col gap-7">
+          <SystemLinks supabase={supabase} type="project" id={project.id} title="Sistemas do projeto" />
           {involvement.size > 0 && (
             <section>
               <h2 className="mb-2 text-base font-semibold">Pessoas</h2>

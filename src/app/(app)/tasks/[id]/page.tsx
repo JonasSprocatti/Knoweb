@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
@@ -230,6 +231,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
       </article>
 
       <aside className="flex flex-col gap-7 text-sm">
+        <SystemLinks supabase={supabase} type="task" id={task.id} title="Sistemas" />
         <section className="rounded-lg border border-line bg-panel p-4">
           <h2 className="mb-2 text-base font-semibold">Tempo</h2>
           <dl className="grid grid-cols-2 gap-y-1.5">
