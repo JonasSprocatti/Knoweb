@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AutoSelect } from "@/components/AutoSelect";
+import { AssigneePicker } from "@/components/AssigneePicker";
 import { saveTask, setTaskStatus } from "@/lib/work-actions";
 import { topicColor } from "@/lib/topicColor";
 import type { Person, Project, ProjectStatus, Recurrence, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
@@ -225,7 +226,7 @@ export function QuickTask({
   sprintId,
 }: {
   projects: Pick<Project, "id" | "name" | "emoji">[];
-  people: Pick<Person, "id" | "name">[];
+  people: Pick<Person, "id" | "name" | "is_me">[];
   projectId?: string;
   noteId?: string;
   parentId?: string;
@@ -250,14 +251,7 @@ export function QuickTask({
           ))}
         </select>
       )}
-      <select name="assignee" multiple aria-label="Responsáveis (Ctrl para vários)" title="Responsáveis (Ctrl/⌘ para escolher vários)" className={`${input} h-9 max-w-40`}>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
-      <input name="new_assignees" placeholder="ou novos nomes, por vírgula" aria-label="Novos responsáveis" className={`${input} w-48`} />
+      <AssigneePicker people={people} />
       <input type="date" name="due_date" aria-label="Prazo" className={input} />
       <input name="estimate_hours" inputMode="decimal" placeholder="horas" aria-label="Estimativa em horas" className={`${input} w-20`} />
       <select name="priority" aria-label="Prioridade" defaultValue="medium" className={input}>

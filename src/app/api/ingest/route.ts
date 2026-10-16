@@ -46,46 +46,66 @@ async function readFile(blob: Blob, name: string): Promise<string> {
 }
 
 /**
- * Liga um arquivo (já enviado ao Storage pelo navegador) a uma nota e lê o conteúdo.
- * - Nota nova: o conteúdo vira o texto da nota e a análise liga a nota à teia.
- * - `attach` (nota que já existe): o conteúdo entra no fim da nota, sob o nome do
- *   arquivo, e nada mais muda — você vê o que entrou e decide se quer analisar.
+ * Liga arquivos (já enviados ao Storage pelo navegador) a uma nota e lê o conteúdo.
+ * - Nota nova: o conteúdo entra no texto da nota (embaixo da sua anotação, se houver)
+ *   e a análise liga a nota à teia.
+ * - `attach` (nota que já existe): o conteúdo entra no fim da nota, sob o nome de
+ *   cada arquivo, e nada mais muda: você vê o que entrou e decide se quer analisar.
+ * Vários arquivos são lidos ao mesmo tempo; um que falhe não derruba os outros.
  */
 export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
   if (!user) return unauthorized();
-  const body = (await request.json().catch(() => ({}))) as { noteId?: string; path?: string; name?: string; attach?: boolean };
-  const { noteId, path, attach } = body;
-  const name = body.name?.slice(0, 200) || "arquivo";
-  if (!noteId || !path) return badRequest("noteId e path obrigatórios.");
-  if (!path.startsWith(`${user.id}/`) || path.includes("..")) return badRequest("Arquivo inválido.");
+  const body = (await request.json().catch(() => ({}))) as {
+    noteId?: string;
+    files?: { path?: string; name?: string }[];
+    path?: string; // um arquivo só (forma antiga)
+    name?: string;
+    attach?: boolean;
+  };
+  const { noteId, attach } = body;
+  const items = (body.files ?? [{ path: body.path, name: body.name }]).map((f) => ({ path: f.path ?? "", name: f.name?.slice(0, 200) || "arquivo" }));
+  if (!noteId || !items.length || items.some((f) => !f.path)) return badRequest("noteId e arquivos obrigatórios.");
+  if (items.length > 10) return badRequest("Envie até 10 arquivos por vez.");
+  if (items.some((f) => !f.path.startsWith(`${user.id}/`) || f.path.includes(".."))) return badRequest("Arquivo inválido.");
   // A regra de acesso (RLS) só devolve a nota se ela for sua
   const { data: own } = await supabase.from("notes").select("id").eq("id", noteId).maybeSingle();
   if (!own) return badRequest("Nota não encontrada.");
 
   try {
-    const { data: file, error: fileErr } = await supabase
+    const { data: files, error: fileErr } = await supabase
       .from("note_files")
-      .insert({ note_id: noteId, path, name })
-      .select("*")
-      .single();
+      .insert(items.map((f) => ({ note_id: noteId, path: f.path, name: f.name })))
+      .select("*");
     if (fileErr) throw new Error(fileErr.message);
     if (!attach) await supabase.from("notes").update({ status: "analyzing" }).eq("id", noteId);
 
-    const { data: blob, error } = await supabase.storage.from("files").download(path);
-    if (error || !blob) throw new Error(error?.message ?? "Arquivo não encontrado.");
-    const read = await readFile(blob, name);
+    const results = await Promise.allSettled(
+      items.map(async (f) => {
+        const { data: blob, error } = await supabase.storage.from("files").download(f.path);
+        if (error || !blob) throw new Error(error?.message ?? "Arquivo não encontrado.");
+        return readFile(blob, f.name);
+      }),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed === items.length) throw (results[0] as PromiseRejectedResult).reason;
+    const sections = results.map((r, i) =>
+      r.status === "fulfilled" ? `## 📎 ${items[i].name}\n\n${r.value}` : `## 📎 ${items[i].name}\n\n_Não consegui ler este arquivo: ${r.reason instanceof Error ? r.reason.message : String(r.reason)}_`,
+    );
+
+    // Lê o texto atual só agora: a leitura pode ter levado um tempo
+    const { data: current } = await supabase.from("notes").select("content").eq("id", noteId).single();
+    const before = current?.content?.trim() ?? "";
+    const content =
+      !attach && !before && items.length === 1
+        ? (results[0] as PromiseFulfilledResult<string>).value // nota nova de um arquivo só: o conteúdo é a nota
+        : [before, ...sections].filter(Boolean).join("\n\n") + "\n";
+    await supabase.from("notes").update({ content }).eq("id", noteId);
 
     if (attach) {
-      // Lê o texto atual só agora: a leitura pode ter levado um tempo
-      const { data: note } = await supabase.from("notes").select("content").eq("id", noteId).single();
-      const content = `${(note?.content ?? "").trimEnd()}\n\n## 📎 ${name}\n\n${read}\n`.trimStart();
-      await supabase.from("notes").update({ content }).eq("id", noteId);
       await syncWikilinks(supabase, noteId, content);
-      return NextResponse.json({ content, file });
+      return NextResponse.json({ content, files, failed });
     }
-
-    await supabase.from("notes").update({ content: read }).eq("id", noteId);
     return NextResponse.json(await analyzeNote(supabase, noteId));
   } catch (err) {
     // Numa nota que já existe, o erro só aparece na tela: o resumo dela não é tocado

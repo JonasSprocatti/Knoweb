@@ -12,7 +12,7 @@ export async function NoteWork({ supabase, noteId, pending }: { supabase: Supaba
     supabase.from("project_notes").select("projects(id, name, slug, emoji, color, status, reason)").eq("note_id", noteId),
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
     supabase.from("note_people").select("people(id, name, slug)").eq("note_id", noteId),
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
   ]);
   const linked = (pn ?? []).map((r) => one(r.projects as unknown as P | null)).filter((p): p is P => !!p);

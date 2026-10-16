@@ -18,7 +18,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
       .from("projects")
       .select("*, owner:people!projects_owner_id_fkey(name, slug), origin:notes!projects_origin_note_id_fkey(id, title), tasks(status, due_date, task_assignees(person_id)), project_notes(count)")
       .order("updated_at", { ascending: false }),
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("templates").select("id, name, emoji").order("name"),
   ]);
 
@@ -64,16 +64,16 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <Link href="/templates" className="ml-2 text-sm font-normal text-muted hover:text-ink hover:underline">Modelos</Link>
         </summary>
         <form action={saveProject} className="mt-3 grid gap-2 sm:grid-cols-[4rem_1fr]">
-          <input name="emoji" placeholder="🚀" aria-label="Emoji" className={input} />
+          <input name="emoji" placeholder="🚀" aria-label="Ícone (emoji)" title="Um emoji que aparece ao lado do nome e na teia" maxLength={8} className={`${input} text-center`} />
           <input name="name" required placeholder="Nome do projeto" aria-label="Nome" className={input} />
           <textarea name="description" placeholder="Objetivo" aria-label="Objetivo" rows={2} className={`${input} sm:col-span-2`} />
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <label className="text-sm text-muted">Início <input type="date" name="start_date" className={input} /></label>
             <label className="text-sm text-muted">Prazo <input type="date" name="due_date" className={input} /></label>
-            <select name="owner_id" aria-label="Responsável" className={input} defaultValue="">
+            <select name="owner_id" aria-label="Responsável" className={input} defaultValue={(people ?? []).find((p) => p.is_me)?.id ?? ""}>
               <option value="">Sem responsável</option>
               {(people ?? []).map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>{p.is_me ? `Eu (${p.name})` : p.name}</option>
               ))}
             </select>
             <select name="template_id" aria-label="Modelo" className={input} defaultValue={modelo}>

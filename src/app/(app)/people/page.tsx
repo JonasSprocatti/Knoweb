@@ -12,7 +12,7 @@ export default async function PeoplePage() {
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("people")
-    .select("id, name, slug, role, task_assignees(tasks(status, due_date, project_id)), note_people(count)")
+    .select("id, name, slug, role, is_me, task_assignees(tasks(status, due_date, project_id)), note_people(count)")
     .order("name");
 
   const people = (data ?? []).map((p) => {
@@ -37,9 +37,25 @@ export default async function PeoplePage() {
         <p className="mt-1 max-w-xl text-muted">Quem aparece nas suas conversas e quem faz o quê. O Claude reconhece as pessoas citadas nas notas.</p>
       </header>
 
+      {!people.some((p) => p.is_me) && (
+        <form action={savePerson} className="flex flex-col gap-2 rounded-lg border border-dashed border-accent/60 p-4">
+          <p className="font-medium text-ink">Quem é você?</p>
+          <p className="text-sm text-muted">
+            Crie a sua pessoa (ou abra uma da lista e clique em “Esta pessoa sou eu”). Você vem marcado por padrão ao criar tarefas e projetos, e o
+            Claude sabe quando algo é seu.
+          </p>
+          <input type="hidden" name="is_me" value="1" />
+          <div className="flex flex-wrap gap-2">
+            <input name="name" required placeholder="Seu nome" aria-label="Seu nome" className={`${input} min-w-40 flex-1`} />
+            <input name="role" placeholder="Seu cargo" aria-label="Seu cargo" className={`${input} min-w-40 flex-1`} />
+            <button className="rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Sou eu</button>
+          </div>
+        </form>
+      )}
+
       <form action={savePerson} className="flex flex-wrap gap-2">
         <input name="name" required placeholder="Nome" aria-label="Nome" className={`${input} flex-1`} />
-        <input name="role" placeholder="Papel (ex.: designer, cliente)" aria-label="Papel" className={input} />
+        <input name="role" placeholder="Cargo / papel (ex.: designer, cliente)" aria-label="Cargo ou papel" className={input} />
         <button className="rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Adicionar pessoa</button>
       </form>
 
@@ -54,7 +70,10 @@ export default async function PeoplePage() {
                   {p.name.slice(0, 1).toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-ink">{p.name}</span>
+                  <span className="block font-medium text-ink">
+                    {p.name}
+                    {p.is_me && <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">Você</span>}
+                  </span>
                   {p.role && <span className="text-sm text-muted">{p.role}</span>}
                 </span>
                 <span className="text-xs text-faint">

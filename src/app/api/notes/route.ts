@@ -14,6 +14,8 @@ export async function POST(request: Request) {
     kind?: "note" | "recording";
     /** "analyzing": nota que vai receber um arquivo (/api/ingest) */
     status?: "ready" | "recording" | "analyzing";
+    /** Nota criada dentro de um projeto: já nasce ligada a ele */
+    project_id?: string;
   };
   const kind = body.kind === "recording" ? "recording" : "note";
   const status = body.status === "recording" || body.status === "analyzing" ? body.status : "ready";
@@ -31,6 +33,12 @@ export async function POST(request: Request) {
     .single();
   if (error) return serverError(error);
 
+  if (body.project_id) {
+    const { error: linkErr } = await supabase
+      .from("project_notes")
+      .upsert({ project_id: body.project_id, note_id: data.id, relevance: 1, source: "manual" });
+    if (linkErr) return serverError(linkErr);
+  }
   if (data.content) await syncWikilinks(supabase, data.id, data.content);
   return NextResponse.json(data);
 }

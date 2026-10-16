@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Só em aparelhos com mouse: no toque não existe "passar por cima" */
+@custom-variant can-hover (@media (hover: hover));
+
 /* ------------------------------------------------------------------
    Tokens de cor — claro por padrão do sistema, escuro automático
    ------------------------------------------------------------------ */
@@ -78,6 +81,75 @@ body {
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.15;
+}
+
+/* ------------------------------------------------------------------
+   Movimento: entrada de tela, gaveta e toque
+   ------------------------------------------------------------------ */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Cada tela nova (e o esqueleto de carregamento) entra com um fade curto.
+   O conteúdo de uma rota nova é sempre um elemento novo em <main>, então a
+   animação roda só ao trocar de tela, não a cada atualização. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+main > * {
+  animation: page-in 0.22s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Gaveta "Mais" do celular sobe de baixo */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+dialog.sheet[open] {
+  animation: sheet-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+dialog[open]::backdrop {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Retorno ao toque nos botões da navegação */
+.press {
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.press:active {
+  transform: scale(0.94);
+  opacity: 0.8;
+}
+
+/* Celular: a barra de baixo sai do caminho enquanto o teclado está aberto */
+.mobile-nav {
+  transition: transform 0.2s ease;
+}
+@media (max-width: 767px) {
+  body:has(:is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="date"]), textarea, select, [contenteditable="true"]):focus) .mobile-nav {
+    transform: translateY(110%);
+  }
+}
+
+/* Esqueleto de carregamento */
+@keyframes shimmer {
+  50% {
+    opacity: 0.55;
+  }
+}
+.skeleton {
+  border-radius: 0.5rem;
+  background: var(--panel);
+  animation: shimmer 1.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

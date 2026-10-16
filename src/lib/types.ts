@@ -98,6 +98,8 @@ export interface Person {
   role: string | null;
   email: string | null;
   about: string | null;
+  /** A pessoa que é você (dono da conta) */
+  is_me?: boolean;
 }
 
 export interface Project {

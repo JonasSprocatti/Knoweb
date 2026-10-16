@@ -36,7 +36,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
 
   const [{ data, error }, { data: people }, { data: projects }, { data: dueProjects }] = await Promise.all([
     q,
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived,suggested)").order("name"),
     calendar
       ? supabase.from("projects").select("id, name, slug, emoji, color, due_date").gte("due_date", `${mes}-01`).lt("due_date", nextMonth).not("status", "in", "(archived,suggested)")

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { deletePerson, savePerson } from "@/lib/work-actions";
+import { deletePerson, savePerson, setMe } from "@/lib/work-actions";
 import { cycleDays, days, formatDay, hours, normalizeTasks, one, Progress, projectColor, PROJECT_STATUS, TASK_COLUMNS, TASK_STATUS, TaskList, taskCode, today } from "@/components/Work";
 import { relativeDate } from "@/lib/text";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
@@ -65,7 +65,15 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
       <div className="flex min-w-0 flex-col gap-8">
         <header className="flex flex-col gap-2">
           <Link href="/people" className="text-faint underline-offset-4 hover:text-ink hover:underline">Pessoas</Link>
-          <h1 className="display text-3xl md:text-4xl">{person.name}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="display text-3xl md:text-4xl">{person.name}</h1>
+            {person.is_me && <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-sm font-medium text-accent">Você</span>}
+            <form action={setMe.bind(null, person.is_me ? null : person.id)}>
+              <button className="rounded-md border border-line px-2.5 py-1 text-xs text-muted hover:border-accent hover:text-ink">
+                {person.is_me ? "Não sou eu" : "Esta pessoa sou eu"}
+              </button>
+            </form>
+          </div>
           {(person.role || person.email) && <p className="text-muted">{[person.role, person.email].filter(Boolean).join(" · ")}</p>}
           {person.about && <p className="max-w-2xl text-muted">{person.about}</p>}
         </header>
@@ -168,10 +176,22 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
           <summary className="cursor-pointer font-semibold">Editar</summary>
           <form action={savePerson} className="mt-3 flex flex-col gap-2">
             <input type="hidden" name="id" value={person.id} />
-            <input name="name" required defaultValue={person.name} aria-label="Nome" className={input} />
-            <input name="role" defaultValue={person.role ?? ""} placeholder="Papel" aria-label="Papel" className={input} />
-            <input name="email" type="email" defaultValue={person.email ?? ""} placeholder="E-mail" aria-label="E-mail" className={input} />
-            <textarea name="about" defaultValue={person.about ?? ""} rows={3} placeholder="Sobre" aria-label="Sobre" className={input} />
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Nome
+              <input name="name" required defaultValue={person.name} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              Cargo / papel
+              <input name="role" defaultValue={person.role ?? ""} placeholder="Ex.: analista de RH, cliente, designer" className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              E-mail
+              <input name="email" type="email" defaultValue={person.email ?? ""} className={input} />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-muted">
+              O que faz
+              <textarea name="about" defaultValue={person.about ?? ""} rows={4} placeholder="Do que cuida, em que é bom, que sistemas usa. O Claude usa isso para escolher a pessoa certa ao sugerir tarefas." className={input} />
+            </label>
             <button className="rounded-md bg-accent px-3 py-1.5 font-semibold text-on-accent hover:brightness-110">Salvar</button>
           </form>
           <div className="mt-3">

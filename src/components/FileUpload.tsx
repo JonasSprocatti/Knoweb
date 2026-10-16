@@ -2,10 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-import { MAX_UPLOAD_BYTES, readAudioDuration } from "@/lib/audio";
-import { DOC_ACCEPT, fileKind, UNSUPPORTED, type FileKind } from "@/lib/files";
-import { finishRecording, ingestDocument, requestTranscription, uploadDocument, uploadSegment } from "@/lib/upload";
+import { ANY_ACCEPT } from "@/lib/files";
+import { notesFromFiles } from "@/lib/upload";
 
 /**
  * Envia arquivos que já existem: áudio (gravador, WhatsApp, Teams…) vai para a
@@ -18,35 +16,14 @@ export function FileUpload({ userId }: { userId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function sendAudio(file: File) {
-    if (file.size > MAX_UPLOAD_BYTES)
-      throw new Error(`${file.name}: maior que 25 MB (limite do Whisper). Exporte em MP3/M4A com qualidade menor ou divida o áudio.`);
-    const duration = await readAudioDuration(file);
-    const note = await api.createNote({ title: file.name.replace(/\.[^.]+$/, ""), kind: "recording", status: "recording" });
-    const segmentId = await uploadSegment({ userId, noteId: note.id, seq: 0, blob: file, mime: file.type || "audio/mpeg", durationSeconds: duration });
-    await finishRecording(note.id); // marca como "transcrevendo"; análise roda ao fim
-    requestTranscription(segmentId).catch(() => undefined);
-    return note.id;
-  }
-
-  async function sendDocument(file: File, kind: Exclude<FileKind, "audio">) {
-    const path = await uploadDocument(userId, file, kind);
-    const note = await api.createNote({ title: file.name.replace(/\.[^.]+$/, ""), status: "analyzing" });
-    // O servidor lê e analisa mesmo se você sair da página
-    ingestDocument({ noteId: note.id, path, name: file.name }).catch(() => undefined);
-    return note.id;
-  }
-
   async function onFiles(files: File[]) {
     setError(null);
     setBusy(true);
     const ids: string[] = [];
     const errors: string[] = [];
     for (const file of files) {
-      const kind = fileKind(file.name, file.type);
       try {
-        if (!kind) throw new Error(`${file.name}: ${UNSUPPORTED}`);
-        ids.push(kind === "audio" ? await sendAudio(file) : await sendDocument(file, kind));
+        ids.push(...(await notesFromFiles({ userId, files: [file] }))); // aqui cada arquivo vira a sua nota
       } catch (err) {
         errors.push(err instanceof Error ? err.message : String(err));
       }
@@ -63,7 +40,7 @@ export function FileUpload({ userId }: { userId: string }) {
         ref={inputRef}
         type="file"
         multiple
-        accept={`audio/*,video/mp4,video/webm,.m4a,.mp3,.wav,.ogg,.webm,.opus,${DOC_ACCEPT}`}
+        accept={ANY_ACCEPT}
         className="hidden"
         onChange={(e) => {
           const files = [...(e.target.files ?? [])];

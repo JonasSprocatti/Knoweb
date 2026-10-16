@@ -21,7 +21,7 @@ export default async function SprintPage({ params }: { params: Promise<{ id: str
   const [{ data: inSprint }, { data: backlog }, { data: people }, { data: projects }] = await Promise.all([
     supabase.from("tasks").select(TASK_COLUMNS).eq("sprint_id", id).neq("status", "canceled").order("created_at"),
     supabase.from("tasks").select(TASK_COLUMNS).is("sprint_id", null).in("status", ["todo", "doing", "blocked"]).order("due_date", { ascending: true, nullsFirst: false }).limit(100),
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived,suggested)").order("name"),
   ]);
   const tasks = normalizeTasks(inSprint).filter((x) => x.status !== "suggested");

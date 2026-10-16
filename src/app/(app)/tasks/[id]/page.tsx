@@ -88,7 +88,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
     supabase.from("task_events").select("id, kind, old_value, new_value, created_at").eq("task_id", id).order("created_at", { ascending: false }),
     supabase.from("task_dependencies").select("tasks!task_dependencies_blocked_by_fkey(id, number, title, status)").eq("task_id", id),
     supabase.from("task_dependencies").select("tasks!task_dependencies_task_id_fkey(id, number, title, status)").eq("blocked_by", id),
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
     supabase.from("sprints").select("id, name, end_date").order("start_date", { ascending: false }).limit(20),
   ]);
@@ -188,7 +188,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
             {(people ?? []).map((p) => (
               <label key={p.id} className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 has-checked:border-accent has-checked:text-accent">
                 <input type="checkbox" name="assignee" value={p.id} defaultChecked={assigned.has(p.id)} className="accent-accent" />
-                {p.name}
+                {p.is_me ? `Eu (${p.name})` : p.name}
               </label>
             ))}
             <input name="new_assignees" placeholder="+ pessoa nova (vírgula para várias)" aria-label="Novos responsáveis" className={`${input} w-64`} />

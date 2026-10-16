@@ -9,7 +9,7 @@ async function json<T>(res: Response): Promise<T> {
 }
 
 export const api = {
-  createNote: (body: { title?: string; content?: string; kind?: "note" | "recording"; status?: "ready" | "recording" | "analyzing" }) =>
+  createNote: (body: { title?: string; content?: string; kind?: "note" | "recording"; status?: "ready" | "recording" | "analyzing"; project_id?: string }) =>
     fetch("/api/notes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(
       (r) => json<Note>(r),
     ),

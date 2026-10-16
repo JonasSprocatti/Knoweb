@@ -24,6 +24,7 @@ import {
 } from "@/components/Work";
 import { TopicChip } from "@/components/TopicChip";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
+import { ProjectInbox } from "@/components/ProjectInbox";
 import type { ProjectStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +49,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
       .from("project_notes")
       .select("source, notes(id, title, summary, created_at, note_topics(topics(id, name, slug, color, emoji)))")
       .eq("project_id", project.id),
-    supabase.from("people").select("id, name").order("name"),
+    supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").neq("status", "archived").order("name"),
     supabase.from("notes").select("id, title").order("updated_at", { ascending: false }).limit(60),
   ]);
@@ -140,6 +141,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         <Stat label="Gasto">{hours(spent)}</Stat>
         <Stat label="Tempo médio por tarefa">{days(avgCycle)}</Stat>
       </dl>
+
+      <ProjectInbox projectId={project.id} />
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
         <section className="flex min-w-0 flex-col gap-4">
@@ -239,7 +242,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                     <span className="block text-xs text-faint">{formatDay(n.created_at)}{n.source === "ai" ? " · ligada pelo Claude" : ""}</span>
                   </Link>
                   <form action={unlinkNote.bind(null, project.id, n.id)}>
-                    <button className="p-1.5 text-faint opacity-0 hover:text-ink group-hover:opacity-100 focus:opacity-100" aria-label={`Desligar ${n.title}`}>×</button>
+                    <button className="p-1.5 text-faint hover:text-ink can-hover:opacity-0 can-hover:group-hover:opacity-100 focus:opacity-100" aria-label={`Desligar ${n.title}`}>×</button>
                   </form>
                 </li>
               ))}
@@ -260,21 +263,36 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <form action={saveProject} className="mt-3 flex flex-col gap-2">
               <input type="hidden" name="id" value={project.id} />
               <div className="flex gap-2">
-                <input name="emoji" defaultValue={project.emoji ?? ""} aria-label="Emoji" className={`${input} w-14`} />
-                <input name="name" required defaultValue={project.name} aria-label="Nome" className={`${input} flex-1`} />
+                <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+                  Ícone
+                  <input name="emoji" defaultValue={project.emoji ?? ""} placeholder="📁" maxLength={8} title="Um emoji que aparece ao lado do nome e na teia" className={`${input} text-center`} />
+                </label>
+                <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
+                  Nome
+                  <input name="name" required defaultValue={project.name} className={input} />
+                </label>
               </div>
-              <textarea name="description" defaultValue={project.description ?? ""} rows={3} aria-label="Objetivo" className={input} />
-              <select name="status" defaultValue={project.status} aria-label="Status" className={input}>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Objetivo
+                <textarea name="description" defaultValue={project.description ?? ""} rows={3} placeholder="O que este projeto precisa entregar" className={input} />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Status
+              <select name="status" defaultValue={project.status} className={input}>
                 {Object.entries(PROJECT_STATUS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
-              <select name="owner_id" defaultValue={owner?.id ?? ""} aria-label="Responsável" className={input}>
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-muted">
+                Responsável
+              <select name="owner_id" defaultValue={owner?.id ?? ""} className={input}>
                 <option value="">Sem responsável</option>
                 {(people ?? []).map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
+              </label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Início <input type="date" name="start_date" defaultValue={project.start_date ?? ""} className={input} /></label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
               <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Salvar</button>

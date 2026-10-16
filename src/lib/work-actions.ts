@@ -273,10 +273,23 @@ export async function savePerson(form: FormData) {
     about: str(form, "about"),
   };
   const saved = id
-    ? must(await supabase.from("people").update(row).eq("id", id).select("slug").single())
-    : must(await supabase.from("people").insert(row).select("slug").single());
+    ? must(await supabase.from("people").update(row).eq("id", id).select("id, slug").single())
+    : must(await supabase.from("people").insert(row).select("id, slug").single());
+  if (form.get("is_me") === "1") await markMe(supabase, saved.id);
   refresh();
   redirect(`/people/${saved.slug}`);
+}
+
+/** Só uma pessoa é "eu": desmarca a anterior antes (o índice único exige). */
+async function markMe(supabase: SupabaseClient, id: string | null) {
+  must(await supabase.from("people").update({ is_me: false }).eq("is_me", true));
+  if (id) must(await supabase.from("people").update({ is_me: true }).eq("id", id));
+}
+
+/** Define (ou tira, com null) quem é você entre as pessoas. */
+export async function setMe(id: string | null) {
+  await markMe(await db(), id);
+  refresh();
 }
 
 /** Exclui a pessoa; tasks = keep (ficam sem ela) | delete (as que só ela fazia). */

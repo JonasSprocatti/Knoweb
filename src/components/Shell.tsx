@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { NewNoteButton } from "@/components/NewNoteButton";
 
@@ -19,7 +19,11 @@ const NAV = [
   { href: "/ask", label: "Perguntar", icon: "ask" },
 ];
 
-const MOBILE_NAV = ["/", "/notes", "/record", "/graph", "/ask"];
+// No celular: quatro atalhos + "Mais" (gaveta com o resto, a conta e o sair)
+const MOBILE_NAV = ["/", "/notes", "/record", "/tasks"];
+const MORE = [...NAV.filter((n) => !MOBILE_NAV.includes(n.href)), { href: "/templates", label: "Modelos", icon: "folder" }].sort(
+  (a, b) => Number(b.href === "/graph") - Number(a.href === "/graph"),
+);
 
 function isActive(path: string, href: string) {
   return href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
@@ -49,6 +53,9 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
   const path = usePathname();
   const router = useRouter();
   const [q, setQ] = useState("");
+  const more = useRef<HTMLDialogElement>(null);
+  useEffect(() => more.current?.close(), [path]); // fecha a gaveta ao trocar de tela
+  const inMore = MORE.some((n) => isActive(path, n.href));
 
   const search = (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,15 +145,15 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       </div>
 
       {/* ---------------- Navegação inferior (celular) ---------------- */}
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {MOBILE_NAV.map((href) => {
             const item = NAV.find((n) => n.href === href)!;
             const active = isActive(path, href);
             if (href === "/record") {
               return (
-                <Link key={href} href={href} className="flex flex-col items-center justify-center py-1.5" aria-label="Gravar">
-                  <span className="-mt-6 flex h-15 w-15 items-center justify-center rounded-full bg-rec text-white ring-4 ring-bg">
+                <Link key={href} href={href} className="press flex flex-col items-center justify-center py-1.5" aria-label="Gravar">
+                  <span className="-mt-6 flex h-15 w-15 items-center justify-center rounded-full bg-rec text-white shadow-lg shadow-rec/30 ring-4 ring-bg">
                     <Icon name="mic" className="h-6 w-6" />
                   </span>
                 </Link>
@@ -157,15 +164,63 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
                 key={href}
                 href={href}
                 aria-current={active ? "page" : undefined}
-                className={`flex flex-col items-center gap-0.5 py-2 text-xs ${active ? "font-semibold text-ink" : "text-faint"}`}
+                className={`press flex flex-col items-center gap-0.5 py-2 text-xs ${active ? "font-semibold text-ink" : "text-faint"}`}
               >
                 <Icon name={item.icon} className={`h-5 w-5 ${active ? "text-accent" : ""}`} />
                 {item.label}
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={() => more.current?.showModal()}
+            aria-haspopup="dialog"
+            className={`press flex flex-col items-center gap-0.5 py-2 text-xs ${inMore ? "font-semibold text-ink" : "text-faint"}`}
+          >
+            <Icon name="more" className={`h-5 w-5 ${inMore ? "text-accent" : ""}`} />
+            Mais
+          </button>
         </div>
       </nav>
+
+      {/* ---------------- Gaveta "Mais" (celular) ---------------- */}
+      <dialog
+        ref={more}
+        onClick={(e) => e.target === more.current && more.current?.close()}
+        aria-label="Mais seções"
+        className="sheet mt-auto mb-0 w-full max-w-none rounded-t-2xl border-t border-line bg-surface p-0 text-ink backdrop:bg-black/40 md:hidden"
+      >
+        <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2">
+          <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line" aria-hidden />
+          <nav className="grid grid-cols-3 gap-2">
+            {MORE.map((item) => {
+              const active = isActive(path, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`press flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-sm ${
+                    active ? "border-accent bg-panel font-semibold text-ink" : "border-line bg-panel text-muted"
+                  }`}
+                >
+                  <Icon name={item.icon} className={`h-6 w-6 ${active ? "text-accent" : ""}`} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+          <div className="mt-4 flex items-center justify-between gap-2 border-t border-line pt-3 text-sm text-faint">
+            <span className="truncate">{email}</span>
+            <form action="/auth/signout" method="post">
+              <button className="press flex items-center gap-1.5 rounded-md px-2 py-1.5 text-muted hover:text-ink">
+                <Icon name="logout" className="h-4 w-4" />
+                Sair
+              </button>
+            </form>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }

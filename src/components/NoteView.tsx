@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, debounce } from "@/lib/api";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { ingestDocument, requestTranscription, uploadDocument } from "@/lib/upload";
-import { DOC_ACCEPT, fileKind, readByAI, UNSUPPORTED, type NoteFile } from "@/lib/files";
+import { DOC_ACCEPT, fileKind, readByAI, UNSUPPORTED, type FileKind, type NoteFile } from "@/lib/files";
 import { formatDuration, relativeDate } from "@/lib/text";
 import type { AudioSegment, Note } from "@/lib/types";
 import { Markdown } from "@/components/Markdown";
@@ -173,19 +173,24 @@ export function NoteView({
     else tab?.close();
   }
 
-  /** Junta um arquivo a esta nota: o conteúdo lido entra no fim do texto, à vista, sem reanalisar. */
-  async function attachFile(file: File) {
+  /** Junta arquivos a esta nota: o conteúdo lido entra no fim do texto, à vista, sem reanalisar. */
+  async function attachFiles(picked: File[]) {
     setAttachError(null);
-    const kind = fileKind(file.name, file.type);
-    if (!kind || kind === "audio") return setAttachError(`${file.name}: ${kind === "audio" ? "áudio entra pela tela Gravar." : UNSUPPORTED}`);
-    setAttaching(readByAI(kind) ? `Lendo ${file.name} com o Claude…` : `Lendo ${file.name}…`);
-    setEditing(false); // nada de digitar enquanto o texto do arquivo entra
+    const checked = picked.map((file) => ({ file, kind: fileKind(file.name, file.type) }));
+    const bad = checked.find((c) => !c.kind || c.kind === "audio");
+    if (bad) return setAttachError(`${bad.file.name}: ${bad.kind === "audio" ? "áudio entra pela tela Gravar." : UNSUPPORTED}`);
+    const label = picked.length === 1 ? picked[0].name : `${picked.length} arquivos`;
+    setAttaching(checked.some((c) => readByAI(c.kind!)) ? `Lendo ${label} com o Claude…` : `Lendo ${label}…`);
+    setEditing(false); // nada de digitar enquanto o texto dos arquivos entra
     try {
       if (dirtyRef.current.title || dirtyRef.current.content) await save.flush({ title, content });
-      const path = await uploadDocument(note.user_id, file, kind);
-      const r = await ingestDocument({ noteId: note.id, path, name: file.name, attach: true });
+      const uploaded = await Promise.all(
+        checked.map(async ({ file, kind }) => ({ path: await uploadDocument(note.user_id, file, kind as Exclude<FileKind, "audio">), name: file.name })),
+      );
+      const r = await ingestDocument({ noteId: note.id, files: uploaded, attach: true });
       if (r.content !== undefined) setContent(r.content);
-      if (r.file) setFiles((prev) => [...prev, r.file!]);
+      if (r.files) setFiles((prev) => [...prev, ...r.files!]);
+      if (r.failed) setAttachError(`${r.failed} arquivo(s) não puderam ser lidos; o motivo está no texto da nota.`);
     } catch (err) {
       setAttachError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -281,7 +286,7 @@ export function NoteView({
               type="button"
               onClick={() => fileInput.current?.click()}
               disabled={!!attaching || note.status === "analyzing"}
-              title="Anexar arquivo a esta nota (Word, PowerPoint, PDF, print, texto)"
+              title="Anexar arquivos a esta nota (Word, PowerPoint, PDF, prints, texto; vários de uma vez)"
               aria-label="Anexar arquivo"
               className="rounded-md p-1.5 transition hover:bg-panel hover:text-ink disabled:opacity-50"
             >
@@ -291,11 +296,12 @@ export function NoteView({
               ref={fileInput}
               type="file"
               accept={DOC_ACCEPT}
+              multiple
               className="hidden"
               onChange={(e) => {
-                const file = e.target.files?.[0];
+                const picked = [...(e.target.files ?? [])].slice(0, 10);
                 e.target.value = "";
-                if (file) attachFile(file);
+                if (picked.length) attachFiles(picked);
               }}
             />
             <IconButton title="Exportar .md (compatível com Obsidian)" onClick={exportMarkdown} icon="notes" />

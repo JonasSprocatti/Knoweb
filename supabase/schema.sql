@@ -556,3 +556,10 @@ create policy "files_own_insert" on storage.objects for insert
   with check (bucket_id = 'files' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "files_own_delete" on storage.objects for delete
   using (bucket_id = 'files' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------
+-- "Eu": a pessoa que representa o dono da conta. Vem marcada por padrão
+-- ao criar tarefas e projetos, e a análise sabe quem é você.
+-- ---------------------------------------------------------------------
+alter table public.people add column if not exists is_me boolean not null default false;
+create unique index if not exists people_one_me on public.people (user_id) where is_me;
