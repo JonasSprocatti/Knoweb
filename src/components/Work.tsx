@@ -186,9 +186,10 @@ function BoardCard({ t, showProject }: { t: TaskRow; showProject?: boolean }) {
 /** Quadro (como o Board do Notion): uma coluna por status. */
 export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProject?: boolean }) {
   return (
-    <div className="grid gap-4 md:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
       {BOARD.map((s) => {
         const col = tasks.filter((t) => t.status === s);
+        if (s === "blocked" && !col.length) return null; // coluna vazia de bloqueadas não ocupa espaço
         return (
           <section key={s} className="rounded-lg border border-line bg-surface p-2">
             <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold">
