@@ -11,7 +11,9 @@ const GraphCanvas = dynamic(() => import("@/components/GraphCanvas"), { ssr: fal
 const GraphCanvas3D = dynamic(() => import("@/components/GraphCanvas3D"), { ssr: false });
 
 const idOf = (end: string | SimNode) => (typeof end === "string" ? end : end.id);
-const radius = (n: SimNode) => (n.type === "topic" ? 4.5 + Math.sqrt(n.weight) * 1.7 : 2.6 + Math.sqrt(n.weight)) * (n.image ? 1.5 : 1);
+const isHub = (n: SimNode) => n.type === "topic" || n.type === "project";
+const WORK = new Set<GraphNode["type"]>(["project", "task", "person"]);
+const radius = (n: SimNode) => (isHub(n) ? 4.5 + Math.sqrt(n.weight) * 1.7 : 2.6 + Math.sqrt(n.weight)) * (n.image ? 1.5 : 1);
 const escapeHtml = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const dayLabel = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { day: "numeric", month: "short", year: "numeric" });
 
@@ -50,6 +52,7 @@ export function GraphView() {
   const [clouds, setClouds] = usePref("teia:nuvens", false);
   const [showTopics, setShowTopics] = useState(true);
   const [showAi, setShowAi] = useState(true);
+  const [showWork, setShowWork] = usePref("teia:trabalho", true);
   const [hideOrphans, setHideOrphans] = useState(false);
   const [hover, setHover] = useState<string | null>(null);
   const [find, setFind] = useState("");
@@ -115,7 +118,9 @@ export function GraphView() {
   const data = useMemo(() => {
     if (!raw) return { nodes: [] as SimNode[], links: [] as SimLink[] };
     const cutoff = step == null ? null : times[step];
-    let nodes = raw.nodes.filter((n) => (showTopics || n.type !== "topic") && (!cutoff || n.created_at <= cutoff));
+    let nodes = raw.nodes.filter(
+      (n) => (showTopics || n.type !== "topic") && (showWork || !WORK.has(n.type)) && (!cutoff || n.created_at <= cutoff),
+    );
     const ids = new Set(nodes.map((n) => n.id));
     const links = raw.links.filter(
       (l) => (showTopics || l.kind !== "topic") && (showAi || l.kind !== "ai") && ids.has(l.source) && ids.has(l.target),
@@ -136,7 +141,7 @@ export function GraphView() {
       }),
       links: links.map((l) => ({ ...l })) as SimLink[],
     };
-  }, [raw, showTopics, showAi, hideOrphans, step, times]);
+  }, [raw, showTopics, showAi, showWork, hideOrphans, step, times]);
 
   const neighbors = useMemo(() => {
     const map = new Map<string, Set<string>>();
@@ -170,9 +175,13 @@ export function GraphView() {
 
   const isLit = (id: string) => !hover || hover === id || !!neighbors.get(hover)?.has(id);
   const openNode = (n: SimNode) => {
+    const taskId = n.id.slice(2);
     if (n.type === "topic") {
       if (n.slug) router.push(`/topics/${n.slug}`);
-    } else router.push(`/notes/${n.id}`);
+    } else if (n.type === "project") router.push(`/projects/${n.slug}`);
+    else if (n.type === "person") router.push(`/people/${n.slug}`);
+    else if (n.type === "task") router.push(`/tasks/${taskId}`);
+    else router.push(`/notes/${n.id}`);
   };
   const tooltip = (n: SimNode) => escapeHtml(n.emoji ? `${n.emoji} ${n.label}` : n.label);
   const particles = (l: SimLink) => (reduced ? 0 : theme.particles(l));
@@ -215,6 +224,7 @@ export function GraphView() {
         <Toggle on={clouds} set={setClouds} label="Nuvens" />
         <Toggle on={showTopics} set={setShowTopics} label="Temas" />
         <Toggle on={showAi} set={setShowAi} label="Ligações do Claude" />
+        <Toggle on={showWork} set={setShowWork} label="Projetos e tarefas" />
         <Toggle on={hideOrphans} set={setHideOrphans} label="Esconder soltos" />
       </div>
 
@@ -236,7 +246,7 @@ export function GraphView() {
             nodeId="id"
             nodeLabel={tooltip}
             nodeColor={(n: SimNode) => n.color}
-            nodeVal={(n: SimNode) => (n.type === "topic" ? 4 + n.weight : 1 + n.weight * 0.5)}
+            nodeVal={(n: SimNode) => (isHub(n) ? 4 + n.weight : 1 + n.weight * 0.5)}
             nodeOpacity={0.95}
             nodeResolution={16}
             linkColor={(l: SimLink) => theme.linkColor(l, true)}
@@ -261,12 +271,12 @@ export function GraphView() {
             linkCurvature={theme.curvature}
             linkColor={(l: SimLink) => theme.linkColor(l, !hover || idOf(l.source) === hover || idOf(l.target) === hover)}
             linkWidth={theme.linkWidth}
-            linkLineDash={(l: SimLink) => (l.kind === "ai" ? [3, 3] : null)}
+            linkLineDash={(l: SimLink) => (l.kind === "ai" || l.kind === "mention" ? [3, 3] : null)}
             linkDirectionalParticles={particles}
             linkDirectionalParticleColor={theme.particleColor}
             linkDirectionalParticleWidth={1.8}
             linkDirectionalParticleSpeed={0.004}
-            nodeVal={(n: SimNode) => (n.type === "topic" ? 3 + n.weight : 1 + n.weight * 0.6)}
+            nodeVal={(n: SimNode) => (isHub(n) ? 3 + n.weight : 1 + n.weight * 0.6)}
             nodeLabel={tooltip}
             onNodeHover={(n: SimNode | null) => setHover(n ? n.id : null)}
             onNodeClick={openNode}
@@ -279,7 +289,7 @@ export function GraphView() {
               ctx.globalCompositeOperation = "lighter";
               for (const n of data.nodes) {
                 if (n.x == null || n.y == null) continue;
-                const r = n.type === "topic" ? 90 : 48;
+                const r = isHub(n) ? 90 : 48;
                 const g = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r);
                 g.addColorStop(0, `${n.color}1f`);
                 g.addColorStop(1, `${n.color}00`);
@@ -310,7 +320,7 @@ export function GraphView() {
                 ctx.strokeStyle = node.color;
                 ctx.lineWidth = Math.max(1, r * 0.12);
                 ctx.stroke();
-              } else if (node.type === "topic" && node.emoji && !theme.topicIsLabel) {
+              } else if (isHub(node) && node.emoji && !(node.type === "topic" && theme.topicIsLabel)) {
                 ctx.font = `${r * 1.1}px ${font}`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -326,13 +336,13 @@ export function GraphView() {
               }
 
               const isTopicLabel = node.type === "topic" && theme.topicIsLabel;
-              const showLabel = !isTopicLabel && (node.type === "topic" ? scale > 0.6 : scale > 1.6 || hover === node.id || (hover && lit));
+              const showLabel = !isTopicLabel && (isHub(node) ? scale > 0.6 : scale > 1.6 || hover === node.id || (hover && lit));
               if (showLabel) {
-                const fontSize = (node.type === "topic" ? 13 : 11) / scale;
-                ctx.font = `${node.type === "topic" ? 650 : 450} ${fontSize}px ${font}`;
+                const fontSize = (isHub(node) ? 13 : 11) / scale;
+                ctx.font = `${isHub(node) ? 650 : 450} ${fontSize}px ${font}`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
-                ctx.fillStyle = node.type === "topic" ? node.color : theme.label;
+                ctx.fillStyle = isHub(node) ? node.color : theme.label;
                 const label = node.label.length > 40 ? `${node.label.slice(0, 38)}…` : node.label;
                 ctx.fillText(label, x, y + r + 3 / scale);
               }

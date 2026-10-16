@@ -3,7 +3,7 @@ export type NoteStatus = "ready" | "recording" | "transcribing" | "analyzing" | 
 
 export interface Insights {
   key_points?: string[];
-  action_items?: { text: string; owner?: string | null; due?: string | null }[];
+  action_items?: { text: string; owner?: string | null; due?: string | null; assignees?: string[]; project?: string | null }[];
   decisions?: string[];
   people?: string[];
   questions?: string[];
@@ -63,7 +63,7 @@ export interface TopicWithCount extends Topic {
 export interface GraphNode {
   id: string;
   label: string;
-  type: "note" | "recording" | "topic";
+  type: "note" | "recording" | "topic" | "project" | "task" | "person";
   weight: number;
   slug?: string;
   /** Cor do tema (ou do tema principal da nota) */
@@ -77,5 +77,59 @@ export interface GraphNode {
 export interface GraphLink {
   source: string;
   target: string;
-  kind: "topic" | "wikilink" | "ai";
+  kind: "topic" | "wikilink" | "ai" | "project" | "task" | "assignee" | "mention";
 }
+
+export type ProjectStatus = "suggested" | "idea" | "active" | "paused" | "done" | "archived";
+export type TaskStatus = "suggested" | "todo" | "doing" | "blocked" | "done" | "canceled";
+export type TaskPriority = "low" | "medium" | "high" | "urgent";
+
+export interface Person {
+  id: string;
+  name: string;
+  slug: string;
+  role: string | null;
+  email: string | null;
+  about: string | null;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  emoji: string | null;
+  color: string | null;
+  status: ProjectStatus;
+  start_date: string | null;
+  due_date: string | null;
+  owner_id: string | null;
+  origin_note_id: string | null;
+  reason: string | null;
+  created_at: string;
+}
+
+export interface Task {
+  id: string;
+  number: number;
+  project_id: string | null;
+  parent_id: string | null;
+  note_id: string | null;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due_date: string | null;
+  estimate_hours: number | null;
+  spent_hours: number;
+  started_at: string | null;
+  completed_at: string | null;
+  source: "ai" | "manual";
+  created_at: string;
+}
+
+/** Tarefa com projeto e responsáveis já juntados (o que as listas mostram). */
+export type TaskRow = Task & {
+  projects: Pick<Project, "id" | "name" | "slug" | "emoji" | "color"> | null;
+  task_assignees: { people: Pick<Person, "id" | "name" | "slug"> | null }[];
+};

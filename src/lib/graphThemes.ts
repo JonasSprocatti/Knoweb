@@ -264,27 +264,41 @@ const constelacao: GraphTheme = {
 
 /** Executivo: plano e sóbrio, segue o modo claro/escuro do app. */
 function executivo(dark: boolean): GraphTheme {
-  const bg = dark ? "#15181F" : "#F6F7F9";
-  const ring = dark ? "#15181F" : "#FFFFFF";
+  const bg = dark ? "#14120F" : "#F6F3EE";
+  const ring = dark ? "#14120F" : "#FFFFFF";
   return {
     id: "executivo",
     name: "Executivo",
     bg,
-    label: dark ? "#E7E9EE" : "#161A23",
+    label: dark ? "#ECE6DC" : "#1F1B16",
     animated: false,
     curvature: 0,
-    linkColor: (l, lit) => (lit ? (dark ? (l.kind === "topic" ? "#3A4150" : "#5A6378") : l.kind === "topic" ? "#D3D8E0" : "#9AA3B2") : dark ? "#262B35" : "#ECEEF2"),
+    linkColor: (l, lit) => (lit ? (dark ? (l.kind === "topic" ? "#3D372E" : "#665D50") : l.kind === "topic" ? "#E0D8CB" : "#A89D8D") : dark ? "#26221C" : "#EFEAE2"),
     linkWidth: (l) => (l.kind === "wikilink" ? 1.4 : 0.8),
     particles: () => 0,
-    particleColor: () => "#7C9CFF",
+    particleColor: () => "#E0A64F",
     backdrop: () => {},
     node: (ctx, n, { r, lit, scale }) => {
       ctx.globalAlpha = lit ? 1 : 0.25;
-      circle(ctx, n.x ?? 0, n.y ?? 0, r);
-      ctx.fillStyle = n.type === "recording" ? ring : n.color;
+      const x = n.x ?? 0;
+      const y = n.y ?? 0;
+      // Forma diz o tipo: tarefa quadrada, projeto losango, pessoa anel, nota círculo
+      if (n.type === "task") {
+        ctx.beginPath();
+        ctx.roundRect(x - r * 0.85, y - r * 0.85, r * 1.7, r * 1.7, r * 0.3);
+      } else if (n.type === "project") {
+        ctx.beginPath();
+        ctx.moveTo(x, y - r * 1.25);
+        ctx.lineTo(x + r * 1.25, y);
+        ctx.lineTo(x, y + r * 1.25);
+        ctx.lineTo(x - r * 1.25, y);
+        ctx.closePath();
+      } else circle(ctx, x, y, r);
+      const hollow = n.type === "recording" || n.type === "person";
+      ctx.fillStyle = hollow ? ring : n.color;
       ctx.fill();
-      ctx.lineWidth = n.type === "recording" ? r * 0.4 : 1.5 / scale;
-      ctx.strokeStyle = n.type === "recording" ? n.color : ring;
+      ctx.lineWidth = hollow ? r * 0.4 : 1.5 / scale;
+      ctx.strokeStyle = hollow ? n.color : ring;
       ctx.stroke();
     },
   };

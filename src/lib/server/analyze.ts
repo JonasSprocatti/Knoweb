@@ -9,12 +9,22 @@ interface AnalysisResult {
   title: string;
   summary: string;
   key_points: string[];
-  action_items: { text: string; owner?: string | null; due?: string | null }[];
+  action_items: {
+    text: string;
+    owner?: string | null;
+    due?: string | null;
+    due_date?: string | null;
+    assignees?: string[];
+    project?: string | null;
+    priority?: string | null;
+    estimate_hours?: number | null;
+  }[];
   decisions: string[];
   people: string[];
   questions: string[];
   topics: { name: string; description: string; relevance: number; emoji?: string }[];
   related_notes: { id: string; reason: string }[];
+  projects?: { name: string; is_new: boolean; description?: string; emoji?: string; reason?: string; relevance?: number }[];
 }
 
 const ANALYSIS_TOOL: Anthropic.Tool = {
@@ -38,9 +48,14 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
         items: {
           type: "object",
           properties: {
-            text: { type: "string" },
+            text: { type: "string", description: "A tarefa, começando por um verbo (ex.: \"Enviar proposta ao cliente\")." },
             owner: { type: ["string", "null"], description: "Responsável, se citado." },
-            due: { type: ["string", "null"], description: "Prazo, se citado." },
+            due: { type: ["string", "null"], description: "Prazo como foi dito, se citado." },
+            due_date: { type: ["string", "null"], description: "Prazo em AAAA-MM-DD, calculado a partir da data da nota quando possível (\"sexta\", \"mês que vem\")." },
+            assignees: { type: "array", items: { type: "string" }, description: "Nomes de quem deve fazer (uma ou mais pessoas). Use o nome exato de uma pessoa existente quando for ela." },
+            project: { type: ["string", "null"], description: "Nome exato do projeto (existente ou sugerido em projects) a que a tarefa pertence." },
+            priority: { type: ["string", "null"], description: "low, medium, high ou urgent, pelo tom da conversa." },
+            estimate_hours: { type: ["number", "null"], description: "Estimativa de horas para fazer, só se der para inferir com alguma base." },
           },
           required: ["text"],
         },
@@ -61,6 +76,23 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
             relevance: { type: "number", description: "0 a 1: quanto a nota trata desse tema." },
           },
           required: ["name", "description", "relevance"],
+        },
+      },
+      projects: {
+        type: "array",
+        description:
+          "Projetos de que a nota trata (até 3). Use o nome exato de um projeto existente quando servir (is_new=false). Sugira um projeto novo (is_new=true) só quando a nota descreve uma iniciativa com objetivo e entregas que não cabe em nenhum existente — não para assuntos genéricos (isso é tema).",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Nome curto do projeto." },
+            is_new: { type: "boolean" },
+            description: { type: "string", description: "Objetivo do projeto em uma frase (só se novo)." },
+            emoji: { type: "string", description: "Um emoji (só se novo)." },
+            reason: { type: "string", description: "Por que criar este projeto, citando a nota (só se novo)." },
+            relevance: { type: "number", description: "0 a 1." },
+          },
+          required: ["name", "is_new"],
         },
       },
       related_notes: {
@@ -87,7 +119,8 @@ Regras:
 - Seja fiel ao conteúdo; não invente fatos, nomes, prazos ou decisões.
 - Transcrições automáticas têm erros: corrija nomes óbvios pelo contexto, mas não force.
 - Prefira temas existentes. Temas são assuntos duradouros (ex.: "Integração SAP", "Carreira", "Game design"), não detalhes de uma conversa.
-- Só relacione notas quando houver ligação de assunto concreta.`;
+- Só relacione notas quando houver ligação de assunto concreta.
+- Projetos são iniciativas com começo, meio e fim; tarefas são ações concretas com dono. Ligue cada tarefa ao projeto certo e às pessoas certas.`;
 
 const DEFAULT_TITLE_RE = /^(Sem título|Gravação \d)/i;
 
@@ -111,7 +144,7 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
   await supabase.from("notes").update({ status: "analyzing" }).eq("id", noteId);
 
   try {
-    const [{ data: topics }, { data: others }] = await Promise.all([
+    const [{ data: topics }, { data: others }, { data: projects }, { data: people }] = await Promise.all([
       supabase.from("topics").select("name, description").order("name").limit(400),
       supabase
         .from("notes")
@@ -119,6 +152,8 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
         .neq("id", noteId)
         .order("updated_at", { ascending: false })
         .limit(150),
+      supabase.from("projects").select("id, name, slug, description, status").neq("status", "archived").order("updated_at", { ascending: false }).limit(150),
+      supabase.from("people").select("id, name, slug, role").order("name").limit(400),
     ]);
 
     const topicList = (topics ?? []).map((t) => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n");
@@ -126,9 +161,22 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
       .map((n) => `- id=${n.id} | ${n.title}${n.summary ? ` — ${clip(n.summary, 220)}` : ""}`)
       .join("\n");
 
+    const projectList = (projects ?? [])
+      .map((p) => `- ${p.name} [${p.status}]${p.description ? `: ${clip(p.description, 160)}` : ""}`)
+      .join("\n");
+    const peopleList = (people ?? []).map((p) => `- ${p.name}${p.role ? ` (${p.role})` : ""}`).join("\n");
+
     const userPrompt = `<temas_existentes>
 ${topicList || "(nenhum ainda)"}
 </temas_existentes>
+
+<projetos_existentes>
+${projectList || "(nenhum ainda)"}
+</projetos_existentes>
+
+<pessoas_existentes>
+${peopleList || "(nenhuma ainda)"}
+</pessoas_existentes>
 
 <outras_notas>
 ${noteList || "(nenhuma ainda)"}
@@ -211,6 +259,8 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       await supabase.from("note_links").upsert(linkRows, { onConflict: "source_id,target_id,kind" });
     }
 
+    await linkWork(supabase, noteId, result, projects ?? [], people ?? []);
+
     // ---- Nota --------------------------------------------------------
     const insights: Insights = {
       key_points: result.key_points ?? [],
@@ -235,4 +285,111 @@ Analise a nota e chame a ferramenta salvar_analise.`;
     await supabase.from("notes").update({ status: "error" }).eq("id", noteId);
     throw err;
   }
+}
+
+type Row = { id: string; name: string; slug: string };
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
+
+/** Cria o que faltar (sem tocar no que já existe) e devolve id por slug. */
+async function ensure(
+  supabase: SupabaseClient,
+  table: "people" | "projects",
+  known: Row[],
+  wanted: { name: string; slug: string; extra?: Record<string, unknown> }[],
+) {
+  const bySlug = new Map(known.map((r) => [r.slug, r.id]));
+  const missing = [...new Map(wanted.filter((w) => !bySlug.has(w.slug)).map((w) => [w.slug, w])).values()];
+  if (missing.length) {
+    await supabase.from(table).upsert(
+      missing.map((w) => ({ name: w.name, slug: w.slug, ...w.extra })),
+      { onConflict: "user_id,slug", ignoreDuplicates: true },
+    );
+    const { data } = await supabase.from(table).select("id, slug").in("slug", missing.map((w) => w.slug));
+    for (const r of data ?? []) bySlug.set(r.slug as string, r.id as string);
+  }
+  return bySlug;
+}
+
+/**
+ * Pessoas, projetos e tarefas da nota. Projetos novos entram como "suggested"
+ * e tarefas como "suggested": você aceita ou descarta. Reanalisar troca só as
+ * sugestões que ainda não foram aceitas.
+ */
+async function linkWork(supabase: SupabaseClient, noteId: string, result: AnalysisResult, projects: Row[], people: Row[]) {
+  const items = (result.action_items ?? []).filter((a) => a.text?.trim());
+
+  // ---- Pessoas ------------------------------------------------------
+  const names = [...(result.people ?? []), ...items.flatMap((a) => a.assignees ?? (a.owner ? [a.owner] : []))]
+    .map((n) => n.trim())
+    .filter(Boolean);
+  const personId = await ensure(supabase, "people", people, names.map((name) => ({ name, slug: slugify(name) })).filter((p) => p.slug));
+  await supabase.from("note_people").delete().eq("note_id", noteId);
+  const mentioned = [...new Set(names.map((n) => personId.get(slugify(n))).filter((id): id is string => !!id))];
+  if (mentioned.length) await supabase.from("note_people").insert(mentioned.map((person_id) => ({ note_id: noteId, person_id })));
+
+  // ---- Projetos -----------------------------------------------------
+  const wantedProjects = (result.projects ?? [])
+    .map((p) => ({ ...p, name: p.name.trim(), slug: slugify(p.name) }))
+    .filter((p) => p.slug && (p.is_new || projects.some((k) => k.slug === p.slug)));
+  const projectId = await ensure(
+    supabase,
+    "projects",
+    projects,
+    wantedProjects.map((p) => ({
+      name: p.name,
+      slug: p.slug,
+      extra: {
+        status: "suggested",
+        description: p.description ?? null,
+        emoji: p.emoji?.trim().slice(0, 8) || null,
+        reason: p.reason ?? null,
+        origin_note_id: noteId,
+      },
+    })),
+  );
+  await supabase.from("project_notes").delete().eq("note_id", noteId).eq("source", "ai");
+  const projectRows = [...new Map(wantedProjects.map((p) => [p.slug, p])).values()]
+    .filter((p) => projectId.has(p.slug))
+    .map((p) => ({
+      project_id: projectId.get(p.slug)!,
+      note_id: noteId,
+      relevance: Math.min(1, Math.max(0, Number(p.relevance) || 0.6)),
+      source: "ai" as const,
+    }));
+  if (projectRows.length) await supabase.from("project_notes").upsert(projectRows, { onConflict: "project_id,note_id", ignoreDuplicates: true });
+
+  // ---- Tarefas ------------------------------------------------------
+  await supabase.from("tasks").delete().eq("note_id", noteId).eq("source", "ai").eq("status", "suggested");
+  const { data: kept } = await supabase.from("tasks").select("title").eq("note_id", noteId);
+  const keptTitles = new Set((kept ?? []).map((t) => String(t.title).toLowerCase()));
+  // Sem projeto citado e a nota só trata de um: a tarefa vai para ele
+  const onlyProject = projectRows.length === 1 ? projectRows[0].project_id : null;
+
+  const fresh = items.filter((a) => !keptTitles.has(a.text.trim().toLowerCase()));
+  if (!fresh.length) return;
+  const { data: created } = await supabase
+    .from("tasks")
+    .insert(
+      fresh.map((a) => ({
+        title: a.text.trim().slice(0, 300),
+        description: a.due && !ISO_DATE.test(a.due_date ?? "") ? `Prazo citado: ${a.due}` : "",
+        note_id: noteId,
+        project_id: (a.project && projectId.get(slugify(a.project))) || onlyProject,
+        status: "suggested",
+        source: "ai",
+        priority: PRIORITIES.has(a.priority ?? "") ? a.priority : "medium",
+        due_date: ISO_DATE.test(a.due_date ?? "") ? a.due_date : null,
+        estimate_hours: Number(a.estimate_hours) > 0 ? Number(a.estimate_hours) : null,
+      })),
+    )
+    .select("id");
+  const assignees = (created ?? []).flatMap((t, i) => {
+    const who = fresh[i].assignees?.length ? fresh[i].assignees! : fresh[i].owner ? [fresh[i].owner!] : [];
+    return [...new Set(who.map((n) => personId.get(slugify(n))).filter((id): id is string => !!id))].map((person_id) => ({
+      task_id: t.id as string,
+      person_id,
+    }));
+  });
+  if (assignees.length) await supabase.from("task_assignees").insert(assignees);
 }

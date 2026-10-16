@@ -4,6 +4,7 @@ import { QuickCapture } from "@/components/QuickCapture";
 import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";
 import { TopicChip } from "@/components/TopicChip";
 import { Icon } from "@/components/Icon";
+import { normalizeTasks, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { Insights, NoteListItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const supabase = await supabaseServer();
 
-  const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }] = await Promise.all([
+  const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }, { data: openTasks }, { count: sugProjects }, { count: sugTasks }] = await Promise.all([
     supabase.from("notes").select(LIST_COLUMNS).eq("pinned", true).order("updated_at", { ascending: false }).limit(6),
     supabase.from("notes").select(LIST_COLUMNS).order("updated_at", { ascending: false }).limit(9),
     supabase.from("topics").select("id, name, slug, color, emoji, note_topics(count)").limit(200),
@@ -21,7 +22,11 @@ export default async function HomePage() {
       .not("analyzed_at", "is", null)
       .order("created_at", { ascending: false })
       .limit(15),
+    supabase.from("tasks").select(TASK_COLUMNS).in("status", ["todo", "doing", "blocked"]).order("due_date", { ascending: true, nullsFirst: false }).limit(8),
+    supabase.from("projects").select("id", { count: "exact", head: true }).eq("status", "suggested"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "suggested"),
   ]);
+  const tasks = normalizeTasks(openTasks);
 
   const topTopics = (topics ?? [])
     .map((t) => ({
@@ -59,6 +64,30 @@ export default async function HomePage() {
       </header>
 
       <QuickCapture />
+
+      <nav className="flex gap-2 overflow-x-auto text-sm md:hidden">
+        {[
+          ["/projects", "Projetos"],
+          ["/tasks", "Tarefas"],
+          ["/people", "Pessoas"],
+          ["/topics", "Temas"],
+          ["/ask", "Perguntar"],
+        ].map(([href, label]) => (
+          <Link key={href} href={href} className="shrink-0 rounded-md border border-line bg-panel px-3 py-1.5 text-ink">
+            {label}
+          </Link>
+        ))}
+      </nav>
+
+      {((sugProjects ?? 0) > 0 || (sugTasks ?? 0) > 0) && (
+        <Link href={(sugProjects ?? 0) > 0 ? "/projects" : "/tasks?estado=sugeridas"} className="flex items-center gap-3 rounded-lg border border-dashed border-accent/60 bg-panel px-4 py-3 text-sm hover:border-accent">
+          <Icon name="sparkle" className="h-4 w-4 text-accent" />
+          <span className="text-ink">
+            O Claude sugeriu {[(sugProjects ?? 0) > 0 && `${sugProjects} ${sugProjects === 1 ? "projeto" : "projetos"}`, (sugTasks ?? 0) > 0 && `${sugTasks} ${sugTasks === 1 ? "tarefa" : "tarefas"}`].filter(Boolean).join(" e ")} a partir das suas notas.
+          </span>
+          <span className="ml-auto text-accent">Revisar</span>
+        </Link>
+      )}
 
       {(pinned ?? []).length > 0 && (
         <section>
@@ -102,7 +131,19 @@ export default async function HomePage() {
             </section>
           )}
 
-          {actions.length > 0 && (
+          {tasks.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between">
+                <SectionTitle>Próximas tarefas</SectionTitle>
+                <Link href="/tasks" className="text-sm text-muted hover:text-ink hover:underline">Todas</Link>
+              </div>
+              <div className="text-sm">
+                <TaskList tasks={tasks} showProject={false} />
+              </div>
+            </section>
+          )}
+
+          {tasks.length === 0 && actions.length > 0 && (
             <section>
               <SectionTitle>Próximos passos</SectionTitle>
               <ul className="flex flex-col gap-4">

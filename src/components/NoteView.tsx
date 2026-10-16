@@ -42,12 +42,15 @@ export function NoteView({
   initialTopics,
   linked,
   startEditing,
+  work,
 }: {
   initialNote: Note;
   initialSegments: AudioSegment[];
   initialTopics: NoteTopic[];
   linked: LinkedNote[];
   startEditing: boolean;
+  /** Projetos, tarefas e pessoas (renderizado no servidor) */
+  work?: React.ReactNode;
 }) {
   const router = useRouter();
   const [note, setNote] = useState(initialNote);
@@ -377,6 +380,8 @@ export function NoteView({
             </form>
           </div>
         </section>
+
+        {work}
 
         <section>
           <h2 className="mb-2 text-base font-semibold">Imagem na teia</h2>

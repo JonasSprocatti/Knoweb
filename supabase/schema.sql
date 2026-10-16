@@ -219,3 +219,205 @@ begin
   exception when duplicate_object then null;
   end;
 end $$;
+
+-- =====================================================================
+-- Trabalho: projetos, tarefas e pessoas — tudo ligado às notas na teia
+-- (rode este bloco no SQL Editor; é idempotente)
+-- =====================================================================
+create table if not exists public.people (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name          text not null,
+  slug          text not null,
+  role          text,                              -- cargo / papel
+  email         text,
+  about         text,
+  created_at    timestamptz not null default now(),
+  unique (user_id, slug)
+);
+
+create table if not exists public.projects (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  name          text not null,
+  slug          text not null,
+  description   text,
+  emoji         text,
+  color         text,
+  -- suggested = o Claude sugeriu a partir de uma nota e você ainda não aceitou
+  status        text not null default 'active'
+                check (status in ('suggested', 'idea', 'active', 'paused', 'done', 'archived')),
+  start_date    date,
+  due_date      date,
+  owner_id      uuid references public.people(id) on delete set null,
+  origin_note_id uuid references public.notes(id) on delete set null,
+  reason        text,                              -- por que o Claude sugeriu
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (user_id, slug)
+);
+
+create table if not exists public.tasks (
+  id            uuid primary key default gen_random_uuid(),
+  number        bigint generated always as identity,             -- ID curto, como no Notion: T-42
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  project_id    uuid references public.projects(id) on delete set null,
+  parent_id     uuid references public.tasks(id) on delete cascade,    -- subtarefa
+  note_id       uuid references public.notes(id) on delete set null,   -- nota de onde saiu
+  title         text not null,
+  description   text not null default '',
+  -- suggested = extraída pelo Claude; vira "todo" quando você aceita
+  status        text not null default 'todo'
+                check (status in ('suggested', 'todo', 'doing', 'blocked', 'done', 'canceled')),
+  priority      text not null default 'medium' check (priority in ('low', 'medium', 'high', 'urgent')),
+  due_date      date,
+  estimate_hours numeric,
+  spent_hours   numeric not null default 0,
+  started_at    timestamptz,
+  completed_at  timestamptz,
+  source        text not null default 'manual' check (source in ('ai', 'manual')),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+
+create index if not exists tasks_project_idx on public.tasks (project_id);
+create index if not exists tasks_note_idx on public.tasks (note_id);
+create index if not exists tasks_user_status_idx on public.tasks (user_id, status, due_date);
+
+create table if not exists public.task_assignees (
+  task_id       uuid not null references public.tasks(id) on delete cascade,
+  person_id     uuid not null references public.people(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key (task_id, person_id)
+);
+create index if not exists task_assignees_person_idx on public.task_assignees (person_id);
+
+-- Dependências: task_id fica bloqueada até blocked_by terminar
+create table if not exists public.task_dependencies (
+  task_id       uuid not null references public.tasks(id) on delete cascade,
+  blocked_by    uuid not null references public.tasks(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key (task_id, blocked_by),
+  check (task_id <> blocked_by)
+);
+create index if not exists task_dependencies_blocker_idx on public.task_dependencies (blocked_by);
+
+create table if not exists public.project_notes (
+  project_id    uuid not null references public.projects(id) on delete cascade,
+  note_id       uuid not null references public.notes(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  relevance     real not null default 0.5,
+  source        text not null default 'ai' check (source in ('ai', 'manual')),
+  primary key (project_id, note_id)
+);
+create index if not exists project_notes_note_idx on public.project_notes (note_id);
+
+create table if not exists public.note_people (
+  note_id       uuid not null references public.notes(id) on delete cascade,
+  person_id     uuid not null references public.people(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  primary key (note_id, person_id)
+);
+create index if not exists note_people_person_idx on public.note_people (person_id);
+
+-- Histórico da tarefa: mudanças registradas pelo banco + comentários
+create table if not exists public.task_events (
+  id            uuid primary key default gen_random_uuid(),
+  task_id       uuid not null references public.tasks(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  kind          text not null,      -- created | status | due_date | project | estimate | spent | priority | title | assigned | unassigned | comment
+  old_value     text,
+  new_value     text,
+  created_at    timestamptz not null default now()
+);
+create index if not exists task_events_task_idx on public.task_events (task_id, created_at);
+
+create or replace function public.task_history() returns trigger
+language plpgsql security invoker as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.status = 'doing' then new.started_at := coalesce(new.started_at, now()); end if;
+    if new.status = 'done' then new.completed_at := coalesce(new.completed_at, now()); end if;
+    return new;
+  end if;
+  new.updated_at := now();
+  if new.status is distinct from old.status then
+    if new.status = 'doing' and new.started_at is null then new.started_at := now(); end if;
+    new.completed_at := case when new.status = 'done' then now() end;
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'status', old.status, new.status);
+  end if;
+  if new.due_date is distinct from old.due_date then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'due_date', old.due_date::text, new.due_date::text);
+  end if;
+  if new.project_id is distinct from old.project_id then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value)
+    values (new.id, new.user_id, 'project',
+            (select name from public.projects where id = old.project_id), (select name from public.projects where id = new.project_id));
+  end if;
+  if new.priority is distinct from old.priority then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'priority', old.priority, new.priority);
+  end if;
+  if new.estimate_hours is distinct from old.estimate_hours then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'estimate', old.estimate_hours::text, new.estimate_hours::text);
+  end if;
+  if new.spent_hours is distinct from old.spent_hours then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'spent', old.spent_hours::text, new.spent_hours::text);
+  end if;
+  if new.title is distinct from old.title then
+    insert into public.task_events (task_id, user_id, kind, old_value, new_value) values (new.id, new.user_id, 'title', old.title, new.title);
+  end if;
+  return new;
+end $$;
+
+create or replace function public.task_created() returns trigger
+language plpgsql security invoker as $$
+begin
+  insert into public.task_events (task_id, user_id, kind, new_value) values (new.id, new.user_id, 'created', new.source);
+  return null;
+end $$;
+
+drop trigger if exists tasks_history on public.tasks;
+create trigger tasks_history before insert or update on public.tasks
+for each row execute function public.task_history();
+
+drop trigger if exists tasks_created on public.tasks;
+create trigger tasks_created after insert on public.tasks
+for each row execute function public.task_created();
+
+create or replace function public.assignee_history() returns trigger
+language plpgsql security invoker as $$
+declare r record;
+begin
+  if tg_op = 'INSERT' then r := new; else r := old; end if;
+  insert into public.task_events (task_id, user_id, kind, new_value)
+  select r.task_id, r.user_id, case when tg_op = 'INSERT' then 'assigned' else 'unassigned' end, p.name
+  from public.people p where p.id = r.person_id
+    and exists (select 1 from public.tasks t where t.id = r.task_id);  -- nada a registrar se a tarefa está sendo apagada
+  return null;
+end $$;
+
+drop trigger if exists task_assignees_history on public.task_assignees;
+create trigger task_assignees_history after insert or delete on public.task_assignees
+for each row execute function public.assignee_history();
+
+create or replace function public.touch_project() returns trigger
+language plpgsql as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists projects_touch on public.projects;
+create trigger projects_touch before update on public.projects
+for each row execute function public.touch_project();
+
+do $$
+declare t text;
+begin
+  foreach t in array array['people', 'projects', 'tasks', 'task_assignees', 'task_dependencies', 'project_notes', 'note_people', 'task_events'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own_rows" on public.%I', t);
+    execute format(
+      'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+  end loop;
+end $$;

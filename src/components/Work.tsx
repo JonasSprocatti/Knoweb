@@ -1,0 +1,267 @@
+import Link from "next/link";
+import { AutoSelect } from "@/components/AutoSelect";
+import { saveTask, setTaskStatus } from "@/lib/work-actions";
+import { topicColor } from "@/lib/topicColor";
+import type { Person, Project, ProjectStatus, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
+
+/** Colunas das listas de tarefas, já com projeto e responsáveis. */
+export const TASK_COLUMNS = "*, projects(id, name, slug, emoji, color), task_assignees(people(id, name, slug))";
+
+export const TASK_STATUS: Record<TaskStatus, { label: string; color: string }> = {
+  suggested: { label: "Sugerida", color: "#8E5B8A" },
+  todo: { label: "A fazer", color: "#8A8073" },
+  doing: { label: "Fazendo", color: "#A8691A" },
+  blocked: { label: "Bloqueada", color: "#D23C32" },
+  done: { label: "Feita", color: "#2F7D73" },
+  canceled: { label: "Cancelada", color: "#C4BBAE" },
+};
+export const BOARD: TaskStatus[] = ["todo", "doing", "blocked", "done"];
+
+export const PRIORITY: Record<TaskPriority, string> = { urgent: "Urgente", high: "Alta", medium: "Média", low: "Baixa" };
+
+export const PROJECT_STATUS: Record<ProjectStatus, string> = {
+  suggested: "Sugerido",
+  idea: "Ideia",
+  active: "Em andamento",
+  paused: "Pausado",
+  done: "Concluído",
+  archived: "Arquivado",
+};
+
+export const projectColor = (p: { slug: string; color?: string | null }) => topicColor(p);
+export const taskCode = (n: number) => `T-${n}`;
+
+export const formatDay = (d: string) =>
+  new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR", { day: "numeric", month: "short" });
+export const today = () => new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+export const isOpen = (s: TaskStatus) => s !== "done" && s !== "canceled";
+export const hours = (h: number | null | undefined) =>
+  h == null ? "—" : `${Number(h).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} h`;
+
+/** Tempo entre começar e terminar (ou até agora). */
+export function cycleDays(t: { started_at: string | null; completed_at: string | null }) {
+  if (!t.started_at) return null;
+  const end = t.completed_at ? new Date(t.completed_at) : new Date();
+  return Math.max(0, (end.getTime() - new Date(t.started_at).getTime()) / 86_400_000);
+}
+export const days = (d: number | null) =>
+  d == null ? "—" : d < 1 ? "menos de 1 dia" : `${Math.round(d)} ${Math.round(d) === 1 ? "dia" : "dias"}`;
+
+export function StatusDot({ status }: { status: TaskStatus }) {
+  const s = TASK_STATUS[status];
+  return <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: s.color }} title={s.label} aria-hidden />;
+}
+
+export function People({ people }: { people: (Pick<Person, "name" | "slug"> | null)[] }) {
+  const list = people.filter((p): p is Pick<Person, "name" | "slug"> => !!p);
+  if (!list.length) return null;
+  return (
+    <span className="flex flex-wrap gap-1">
+      {list.map((p) => (
+        <Link key={p.slug} href={`/people/${p.slug}`} className="rounded bg-surface px-1.5 text-xs text-muted hover:text-ink">
+          {p.name}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
+export function Progress({ done, total, color }: { done: number; total: number; color?: string }) {
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  return (
+    <span className="flex items-center gap-2 text-xs tabular-nums text-faint">
+      <span className="h-1.5 w-24 overflow-hidden rounded-full bg-surface" aria-hidden>
+        <span className="block h-full rounded-full" style={{ width: `${pct}%`, background: color ?? "var(--accent)" }} />
+      </span>
+      {done}/{total}
+    </span>
+  );
+}
+
+/** Muda o status direto na lista. */
+export function StatusSelect({ id, status }: { id: string; status: TaskStatus }) {
+  return (
+    <form action={setTaskStatus.bind(null, id)}>
+      <AutoSelect
+        name="status"
+        defaultValue={status}
+        aria-label="Status"
+        className="rounded border border-line bg-panel px-1 py-0.5 text-xs text-muted focus:border-accent focus:outline-none"
+      >
+        {Object.entries(TASK_STATUS).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v.label}
+          </option>
+        ))}
+      </AutoSelect>
+    </form>
+  );
+}
+
+export function TaskItem({ task, showProject = true }: { task: TaskRow; showProject?: boolean }) {
+  const overdue = task.due_date && isOpen(task.status) && task.due_date < today();
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 last:border-0">
+      <StatusDot status={task.status} />
+      <Link href={`/tasks/${task.id}`} className={`min-w-0 flex-1 ${task.status === "done" ? "text-faint line-through" : "text-ink"} hover:underline`}>
+        <span className="mr-2 text-xs tabular-nums text-faint">{taskCode(task.number)}</span>
+        {task.title}
+      </Link>
+      {showProject && task.projects && (
+        <Link href={`/projects/${task.projects.slug}`} className="flex items-center gap-1 text-xs text-muted hover:text-ink">
+          <span className="h-2 w-2 rounded-full" style={{ background: projectColor(task.projects) }} aria-hidden />
+          {task.projects.emoji} {task.projects.name}
+        </Link>
+      )}
+      <People people={task.task_assignees.map((a) => a.people)} />
+      {(task.priority === "high" || task.priority === "urgent") && (
+        <span className="text-xs font-semibold text-rec">{PRIORITY[task.priority]}</span>
+      )}
+      {task.due_date && <span className={`text-xs tabular-nums ${overdue ? "font-semibold text-rec" : "text-faint"}`}>{formatDay(task.due_date)}</span>}
+      <StatusSelect id={task.id} status={task.status} />
+    </li>
+  );
+}
+
+export function TaskList({ tasks, showProject, empty }: { tasks: TaskRow[]; showProject?: boolean; empty?: string }) {
+  if (!tasks.length) return <p className="py-3 text-sm text-faint">{empty ?? "Nenhuma tarefa."}</p>;
+  return (
+    <ul className="flex flex-col">
+      {tasks.map((t) => (
+        <TaskItem key={t.id} task={t} showProject={showProject} />
+      ))}
+    </ul>
+  );
+}
+
+/** Quadro (como o Board do Notion): uma coluna por status. */
+export function TaskBoard({ tasks, showProject }: { tasks: TaskRow[]; showProject?: boolean }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-4">
+      {BOARD.map((s) => {
+        const col = tasks.filter((t) => t.status === s);
+        return (
+          <section key={s} className="rounded-lg border border-line bg-surface p-2">
+            <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold">
+              <StatusDot status={s} /> {TASK_STATUS[s].label} <span className="font-normal text-faint">{col.length}</span>
+            </h3>
+            <ul className="flex flex-col gap-2">
+              {col.map((t) => (
+                <li key={t.id} className="rounded-md border border-line bg-panel p-2.5 text-sm">
+                  <Link href={`/tasks/${t.id}`} className="block text-ink hover:underline">
+                    <span className="mr-1.5 text-xs text-faint">{taskCode(t.number)}</span>
+                    {t.title}
+                  </Link>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    {showProject && t.projects && <span className="text-xs text-muted">{t.projects.emoji} {t.projects.name}</span>}
+                    <People people={t.task_assignees.map((a) => a.people)} />
+                    {t.due_date && (
+                      <span className={`text-xs ${isOpen(t.status) && t.due_date < today() ? "text-rec" : "text-faint"}`}>{formatDay(t.due_date)}</span>
+                    )}
+                  </div>
+                  <div className="mt-2">
+                    <StatusSelect id={t.id} status={t.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Linha do tempo (como o Timeline do Notion): barras do início ao prazo. */
+export function Timeline({ items }: { items: { id: string; label: string; href: string; start: string; end: string; color: string; done?: boolean }[] }) {
+  if (!items.length) return <p className="py-3 text-sm text-faint">Dê datas de início e prazo para ver a linha do tempo.</p>;
+  const t = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).getTime();
+  const min = Math.min(...items.map((i) => t(i.start)), t(today()));
+  const max = Math.max(...items.map((i) => t(i.end)), t(today())) + 86_400_000;
+  const pos = (d: string) => ((t(d) - min) / (max - min)) * 100;
+  return (
+    <div className="relative flex flex-col gap-1.5 rounded-lg border border-line bg-panel p-3">
+      <span className="absolute inset-y-0 w-px bg-rec/60" style={{ left: `calc(${pos(today())}% )` }} title="Hoje" aria-hidden />
+      <div className="flex justify-between text-xs text-faint">
+        <span>{formatDay(new Date(min).toISOString())}</span>
+        <span>{formatDay(new Date(max - 86_400_000).toISOString())}</span>
+      </div>
+      {items.map((i) => (
+        <Link key={i.id} href={i.href} className="relative block h-6" title={`${i.label}: ${formatDay(i.start)} → ${formatDay(i.end)}`}>
+          <span
+            className={`absolute inset-y-0 flex items-center overflow-hidden whitespace-nowrap rounded px-2 text-xs font-medium text-white ${i.done ? "opacity-50" : ""}`}
+            style={{ left: `${pos(i.start)}%`, width: `max(${pos(i.end) - pos(i.start)}%, 6px)`, minWidth: "1.5rem", background: i.color }}
+          >
+            {i.label}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
+
+/** Criação rápida de tarefa: título, projeto, responsáveis, prazo e estimativa. */
+export function QuickTask({
+  projects,
+  people,
+  projectId,
+  noteId,
+  parentId,
+}: {
+  projects: Pick<Project, "id" | "name" | "emoji">[];
+  people: Pick<Person, "id" | "name">[];
+  projectId?: string;
+  noteId?: string;
+  parentId?: string;
+}) {
+  return (
+    <form action={saveTask} className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line p-2.5">
+      <input type="hidden" name="assignees_present" value="1" />
+      {noteId && <input type="hidden" name="note_id" value={noteId} />}
+      {parentId && <input type="hidden" name="parent_id" value={parentId} />}
+      <input name="title" required placeholder={parentId ? "+ Subtarefa" : "+ Nova tarefa"} aria-label="Tarefa" className={`${input} min-w-48 flex-1`} />
+      {projectId ? (
+        <input type="hidden" name="project_id" value={projectId} />
+      ) : (
+        <select name="project_id" aria-label="Projeto" className={input} defaultValue="">
+          <option value="">Sem projeto</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.emoji} {p.name}
+            </option>
+          ))}
+        </select>
+      )}
+      <select name="assignee" multiple aria-label="Responsáveis (Ctrl para vários)" title="Responsáveis (Ctrl/⌘ para escolher vários)" className={`${input} h-9 max-w-40`}>
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+      <input name="new_assignees" placeholder="ou novos nomes, por vírgula" aria-label="Novos responsáveis" className={`${input} w-48`} />
+      <input type="date" name="due_date" aria-label="Prazo" className={input} />
+      <input name="estimate_hours" inputMode="decimal" placeholder="horas" aria-label="Estimativa em horas" className={`${input} w-20`} />
+      <select name="priority" aria-label="Prioridade" defaultValue="medium" className={input}>
+        {Object.entries(PRIORITY).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
+      <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Criar</button>
+    </form>
+  );
+}
+
+/** Junta as relações do Supabase (que podem vir como lista) num objeto só. */
+export const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
+export function normalizeTasks(rows: unknown[] | null): TaskRow[] {
+  return ((rows ?? []) as TaskRow[]).map((t) => ({
+    ...t,
+    projects: one(t.projects),
+    task_assignees: (t.task_assignees ?? []).map((a) => ({ people: one(a.people) })),
+  }));
+}

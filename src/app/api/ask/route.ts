@@ -8,9 +8,9 @@ export const maxDuration = 300;
 type Turn = { role: "user" | "assistant"; content: string };
 
 const SYSTEM = `Você é o assistente da base de conhecimento pessoal do usuário (notas escritas e transcrições de conversas).
-Responda em português do Brasil usando SOMENTE as notas fornecidas como fonte. Se as notas não respondem, diga isso claramente e sugira o que gravar ou anotar.
+Responda em português do Brasil usando SOMENTE as notas e o quadro de trabalho (projetos, tarefas, pessoas) fornecidos como fonte. Se as notas não respondem, diga isso claramente e sugira o que gravar ou anotar.
 Cite as notas de onde tirou cada informação escrevendo o título exato entre colchetes duplos, como [[Título da nota]].
-Seja direto. Use listas quando ajudarem. Quando citar o que alguém disse numa gravação, inclua a marca de tempo se houver.`;
+Cite tarefas pelo código (ex.: T-12) e projetos pelo nome. Seja direto. Use listas quando ajudarem. Quando citar o que alguém disse numa gravação, inclua a marca de tempo se houver.`;
 
 /**
  * "Perguntar à teia": busca as notas mais relevantes no Postgres e pede ao
@@ -63,6 +63,27 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
     })
     .join("\n\n");
 
+  // Quadro de trabalho: projetos ativos e tarefas abertas/recentes, com quem e quando
+  const [{ data: projects }, { data: tasks }] = await Promise.all([
+    supabase.from("projects").select("name, status, description, due_date, owner:people!projects_owner_id_fkey(name)").not("status", "in", "(archived)").limit(60),
+    supabase
+      .from("tasks")
+      .select("number, title, status, priority, due_date, estimate_hours, spent_hours, completed_at, projects(name), task_assignees(people(name))")
+      .neq("status", "canceled")
+      .order("updated_at", { ascending: false })
+      .limit(150),
+  ]);
+  const name = (v: unknown) => ((Array.isArray(v) ? v[0] : v) as { name?: string } | null)?.name;
+  const work = [
+    ...(projects ?? []).map(
+      (p) => `Projeto "${p.name}" [${p.status}]${name(p.owner) ? ` resp. ${name(p.owner)}` : ""}${p.due_date ? ` prazo ${p.due_date}` : ""}${p.description ? ` — ${clip(p.description, 200)}` : ""}`,
+    ),
+    ...(tasks ?? []).map((t) => {
+      const who = (t.task_assignees ?? []).map((a) => name(a.people)).filter(Boolean).join(", ");
+      return `T-${t.number} "${t.title}" [${t.status}, ${t.priority}]${name(t.projects) ? ` projeto ${name(t.projects)}` : ""}${who ? ` com ${who}` : ""}${t.due_date ? ` prazo ${t.due_date}` : ""}${t.estimate_hours ? ` est. ${t.estimate_hours}h` : ""}${Number(t.spent_hours) ? ` gasto ${t.spent_hours}h` : ""}${t.completed_at ? ` feita em ${String(t.completed_at).slice(0, 10)}` : ""}`;
+    }),
+  ].join("\n");
+
   const messages = [
     ...history
       .slice(-6)
@@ -70,7 +91,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
       .map((t) => ({ role: t.role, content: t.content })),
     {
       role: "user" as const,
-      content: `<notas>\n${context || "(nenhuma nota encontrada)"}\n</notas>\n\nPergunta: ${question}`,
+      content: `<trabalho hoje="${new Date().toISOString().slice(0, 10)}">\n${work || "(nenhum projeto ou tarefa)"}\n</trabalho>\n\n<notas>\n${context || "(nenhuma nota encontrada)"}\n</notas>\n\nPergunta: ${question}`,
     },
   ];
 

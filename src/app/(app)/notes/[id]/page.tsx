@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { NoteView, type LinkedNote, type NoteTopic } from "@/components/NoteView";
+import { NoteWork } from "@/components/NoteWork";
 import type { AudioSegment, Note } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +61,7 @@ export default async function NotePage({
       initialTopics={noteTopics}
       linked={linked}
       startEditing={edit === "1"}
+      work={<NoteWork supabase={supabase} noteId={id} />}
     />
   );
 }

@@ -4,34 +4,34 @@
    Tokens de cor — claro por padrão do sistema, escuro automático
    ------------------------------------------------------------------ */
 :root {
-  --bg: #f6f7f9;
-  --surface: #eef0f3;
+  --bg: #f6f3ee;
+  --surface: #fbf9f5;
   --panel: #ffffff;
-  --line: #e1e4ea;
-  --ink: #161a23;
-  --muted: #4a5263;
-  --faint: #737b8c;
-  --accent: #2347c5;
+  --line: #e4ddd2;
+  --ink: #1f1b16;
+  --muted: #5f574c;
+  --faint: #8a8073;
+  --accent: #a8691a;
   --on-accent: #ffffff;
-  --topic: #2f8f83;
-  --rec: #c8323c;
-  --link: #2347c5;
+  --topic: #2f7d73;
+  --rec: #d23c32;
+  --link: #8a4f0b;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #15181f;
-    --surface: #1a1e26;
-    --panel: #1f242e;
-    --line: #2c323e;
-    --ink: #e7e9ee;
-    --muted: #a4abb8;
-    --faint: #7a8291;
-    --accent: #7c9cff;
-    --on-accent: #0f1630;
-    --topic: #5cc4b5;
-    --rec: #ef6670;
-    --link: #8fabff;
+    --bg: #14120f;
+    --surface: #1a1814;
+    --panel: #201d18;
+    --line: #2f2b24;
+    --ink: #ece6dc;
+    --muted: #b3aa9c;
+    --faint: #8a8174;
+    --accent: #e0a64f;
+    --on-accent: #1a1408;
+    --topic: #6cc3b5;
+    --rec: #f0584d;
+    --link: #f0bd6e;
   }
 }
 
