@@ -75,7 +75,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
 
   const { data: row } = await supabase
     .from("tasks")
-    .select(`${TASK_COLUMNS}, notes(id, title), parent:tasks!tasks_parent_id_fkey(id, number, title)`)
+    .select(`${TASK_COLUMNS}, notes(id, title), parent:parent_id(id, number, title)`)
     .eq("id", id)
     .maybeSingle();
   if (!row) notFound();
