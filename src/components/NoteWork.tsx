@@ -5,11 +5,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntityKind, PendingCreations } from "@/lib/types";
 import { ENTITY } from "@/lib/entities";
 import { Icon } from "@/components/Icon";
+import { Markdown } from "@/components/Markdown";
 
 type P = { id: string; name: string; slug: string; emoji: string | null; color: string | null; status: string; reason: string | null };
 
 /** Painel da nota: projetos, tarefas e pessoas que saíram dela. */
-export async function NoteWork({ supabase, noteId, pending }: { supabase: SupabaseClient; noteId: string; pending?: PendingCreations }) {
+export async function NoteWork({
+  supabase,
+  noteId,
+  pending,
+  versions = [],
+}: {
+  supabase: SupabaseClient;
+  noteId: string;
+  pending?: PendingCreations;
+  versions?: { id: string; changes: string | null; file_name: string | null; created_at: string }[];
+}) {
   const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }, { data: entRows }] = await Promise.all([
     supabase.from("project_notes").select("projects(id, name, slug, emoji, color, status, reason)").eq("note_id", noteId),
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
@@ -152,6 +163,31 @@ export async function NoteWork({ supabase, noteId, pending }: { supabase: Supaba
           </div>
         </details>
       </section>
+
+      {versions.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-base font-semibold">Versões anteriores</h2>
+          <ul className="flex flex-col gap-2 text-sm">
+            {versions.map((v) => (
+              <li key={v.id} className="rounded-md border border-line p-2.5">
+                <p className="text-xs text-faint">
+                  Substituída em {new Date(v.created_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
+                  {v.file_name && <> por {v.file_name}</>}
+                </p>
+                {v.changes && (
+                  <details className="mt-1">
+                    <summary className="cursor-pointer text-muted hover:text-ink">O que mudou</summary>
+                    <Markdown className="mt-1 text-sm">{v.changes}</Markdown>
+                  </details>
+                )}
+                <div className="mt-1.5 flex gap-3">
+                  <Link href={`/notes/${noteId}/versoes/${v.id}`} className="font-medium text-accent hover:underline">Comparar lado a lado</Link>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {ents.length > 0 && (
         <section>

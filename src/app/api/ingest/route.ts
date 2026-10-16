@@ -5,6 +5,7 @@ import { anthropic, CLAUDE_MODEL } from "@/lib/server/claude";
 import { analyzeNote } from "@/lib/server/analyze";
 import { syncWikilinks } from "@/lib/server/links";
 import { docxToMarkdown, pptxToMarkdown } from "@/lib/server/office";
+import { findPreviousVersion, mergeAsVersion } from "@/lib/server/versions";
 import { badRequest, serverError, unauthorized } from "@/lib/server/http";
 import { fileKind, UNSUPPORTED } from "@/lib/files";
 
@@ -105,6 +106,12 @@ export async function POST(request: Request) {
     if (attach) {
       await syncWikilinks(supabase, noteId, content);
       return NextResponse.json({ content, files, failed });
+    }
+    // Já veio uma versão anterior deste documento? Atualiza a original e guarda o histórico
+    const previous = await findPreviousVersion(supabase, noteId, content, items.map((f) => f.name)).catch(() => null);
+    if (previous) {
+      await mergeAsVersion(supabase, noteId, previous, content, items.map((f) => f.name).join(", "));
+      return NextResponse.json({ mergedInto: previous, ...(await analyzeNote(supabase, previous)) });
     }
     return NextResponse.json(await analyzeNote(supabase, noteId));
   } catch (err) {

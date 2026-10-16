@@ -580,3 +580,18 @@ export async function unlinkEntity(noteId: string, entityId: string) {
   must(await supabase.from("note_entities").delete().eq("note_id", noteId).eq("entity_id", entityId));
   refresh();
 }
+
+/** Volta a nota para uma versão anterior; o texto atual vira versão também (nada se perde). */
+export async function restoreVersion(noteId: string, versionId: string) {
+  const supabase = await db();
+  const [{ data: v }, { data: note }] = await Promise.all([
+    supabase.from("note_versions").select("content, created_at").eq("id", versionId).single(),
+    supabase.from("notes").select("content").eq("id", noteId).single(),
+  ]);
+  if (!v || !note) throw new Error("Versão não encontrada.");
+  const when = new Date(v.created_at as string).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+  must(await supabase.from("note_versions").insert({ note_id: noteId, content: note.content, changes: `Substituída ao restaurar a versão de ${when}.` }));
+  must(await supabase.from("notes").update({ content: v.content }).eq("id", noteId));
+  refresh();
+  redirect(`/notes/${noteId}`);
+}

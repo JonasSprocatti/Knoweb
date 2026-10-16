@@ -601,3 +601,23 @@ begin
       'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Versões: um documento enviado que é nova versão de outro atualiza a nota
+-- original; o texto anterior fica guardado aqui, com o que mudou.
+-- ---------------------------------------------------------------------
+alter table public.notes add column if not exists merged_into uuid references public.notes(id) on delete set null;
+
+create table if not exists public.note_versions (
+  id            uuid primary key default gen_random_uuid(),
+  note_id       uuid not null references public.notes(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  content       text not null,          -- o texto como era antes desta atualização
+  changes       text,                   -- o que mudou (resumo do Claude)
+  file_name     text,                   -- arquivo que trouxe a versão nova
+  created_at    timestamptz not null default now()
+);
+create index if not exists note_versions_note_idx on public.note_versions (note_id, created_at desc);
+alter table public.note_versions enable row level security;
+drop policy if exists "own_rows" on public.note_versions;
+create policy "own_rows" on public.note_versions for all using (user_id = auth.uid()) with check (user_id = auth.uid());

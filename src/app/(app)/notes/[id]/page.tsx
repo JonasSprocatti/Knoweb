@@ -19,16 +19,16 @@ export default async function NotePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; versao?: string }>;
 }) {
   const { id } = await params;
-  const { edit } = await searchParams;
+  const { edit, versao } = await searchParams;
   const supabase = await supabaseServer();
 
   const { data: note } = await supabase.from("notes").select("*").eq("id", id).maybeSingle();
   if (!note) notFound();
 
-  const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }, { count: sugTasks }, { count: sugProjects }] = await Promise.all([
+  const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }, { count: sugTasks }, { count: sugProjects }, { data: versions }] = await Promise.all([
     supabase.from("audio_segments").select("*").eq("note_id", id).order("seq"),
     supabase.from("note_files").select("*").eq("note_id", id).order("created_at"),
     supabase.from("note_topics").select("relevance, source, topics(id, name, slug, color, emoji)").eq("note_id", id).order("relevance", { ascending: false }),
@@ -36,6 +36,7 @@ export default async function NotePage({
     supabase.from("note_links").select("source_id, kind, reason, notes!note_links_source_id_fkey(id, title)").eq("target_id", id),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("note_id", id).eq("status", "suggested"),
     supabase.from("project_notes").select("projects!inner(status)", { count: "exact", head: true }).eq("note_id", id).eq("projects.status", "suggested"),
+    supabase.from("note_versions").select("id, changes, file_name, created_at").eq("note_id", id).order("created_at", { ascending: false }),
   ]);
   const pending = (note as Note).insights?.pending;
   const toReview = (pending?.topics.length ?? 0) + (pending?.people.length ?? 0) + (pending?.entities?.length ?? 0) + (sugTasks ?? 0) + (sugProjects ?? 0);
@@ -66,10 +67,11 @@ export default async function NotePage({
       initialSegments={(segments ?? []) as AudioSegment[]}
       initialFiles={(files ?? []) as NoteFile[]}
       toReview={toReview}
+      newVersion={versao === "nova" && versions?.[0] ? { id: versions[0].id as string, changes: (versions[0].changes as string | null) ?? "" } : null}
       initialTopics={noteTopics}
       linked={linked}
       startEditing={edit === "1"}
-      work={<NoteWork supabase={supabase} noteId={id} pending={(note as Note).insights?.pending} />}
+      work={<NoteWork supabase={supabase} noteId={id} pending={(note as Note).insights?.pending} versions={versions ?? []} />}
     />
   );
 }

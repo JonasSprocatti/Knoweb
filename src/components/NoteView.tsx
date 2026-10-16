@@ -44,6 +44,7 @@ export function NoteView({
   initialSegments,
   initialFiles,
   toReview = 0,
+  newVersion = null,
   initialTopics,
   linked,
   startEditing,
@@ -54,6 +55,8 @@ export function NoteView({
   initialFiles: NoteFile[];
   /** Quantas coisas o Claude quer criar a partir da nota (temas, pessoas, projetos, tarefas) */
   toReview?: number;
+  /** A nota acabou de receber uma versão nova de um documento: mostra o que mudou */
+  newVersion?: { id: string; changes: string } | null;
   initialTopics: NoteTopic[];
   linked: LinkedNote[];
   startEditing: boolean;
@@ -134,7 +137,12 @@ export function NoteView({
         (payload) => {
           // Textos grandes que não mudaram não vêm no aviso (o Postgres só manda o que mudou):
           // campo ausente = mantém o que já está na tela
-          const next = payload.new as Partial<Note>;
+          const next = payload.new as Partial<Note> & { merged_into?: string | null };
+          // O documento era nova versão de outra nota: ela foi atualizada e esta some
+          if (next.merged_into) {
+            router.replace(`/notes/${next.merged_into}?versao=nova`);
+            return;
+          }
           setNote((prev) => {
             const finishedAnalysis = prev.status === "analyzing" && next.status === "ready";
             if (finishedAnalysis) setTimeout(() => router.refresh(), 300);
@@ -283,6 +291,21 @@ export function NoteView({
     <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
       {/* ===================== Coluna principal ===================== */}
       <article className="flex min-w-0 flex-col gap-5">
+        {newVersion && (
+          <div className="pop rounded-lg border border-accent/60 bg-panel p-4">
+            <p className="mb-2 font-semibold text-ink">📄 O documento enviado era uma nova versão desta nota. O texto foi atualizado; o anterior ficou guardado.</p>
+            {newVersion.changes && (
+              <>
+                <p className="mb-1 text-sm font-medium text-muted">O que mudou</p>
+                <Markdown className="text-sm">{newVersion.changes}</Markdown>
+              </>
+            )}
+            <a href={`/notes/${note.id}/versoes/${newVersion.id}`} className="mt-3 inline-block text-sm font-medium text-accent hover:underline">
+              Ver as duas versões lado a lado →
+            </a>
+          </div>
+        )}
+
         {/* No celular o painel lateral fica no fim da página: avisa em cima */}
         {toReview > 0 && (
           <a href="#criar" className="press flex items-center gap-2 rounded-lg border border-dashed border-accent/60 bg-panel px-3 py-2 text-sm text-ink lg:hidden">
