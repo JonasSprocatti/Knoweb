@@ -89,6 +89,11 @@ body {
 html {
   -webkit-tap-highlight-color: transparent;
 }
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
 
 /* Cada tela nova (e o esqueleto de carregamento) entra com um fade curto.
    O conteúdo de uma rota nova é sempre um elemento novo em <main>, então a

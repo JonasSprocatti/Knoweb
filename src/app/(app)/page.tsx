@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const supabase = await supabaseServer();
 
-  const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }, { data: openTasks }, { count: sugProjects }, { count: sugTasks }] = await Promise.all([
+  const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }, { data: openTasks }, { count: sugProjects }, { count: sugTasks }, { data: me }] = await Promise.all([
     supabase.from("notes").select(LIST_COLUMNS).eq("pinned", true).order("updated_at", { ascending: false }).limit(6),
     supabase.from("notes").select(LIST_COLUMNS).order("updated_at", { ascending: false }).limit(9),
     supabase.from("topics").select("id, name, slug, color, emoji, note_topics(count)").limit(200),
@@ -25,8 +25,19 @@ export default async function HomePage() {
     supabase.from("tasks").select(TASK_COLUMNS).in("status", ["todo", "doing", "blocked"]).order("due_date", { ascending: true, nullsFirst: false }).limit(8),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("status", "suggested"),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("status", "suggested"),
+    supabase.from("people").select("id, slug").eq("is_me", true).maybeSingle(),
   ]);
-  const tasks = normalizeTasks(openTasks);
+  // Com "eu" definido, a lista é das suas tarefas
+  const { data: myTasks } = me
+    ? await supabase
+        .from("tasks")
+        .select(TASK_COLUMNS.replace("task_assignees(", "mine:task_assignees!inner(person_id), task_assignees("))
+        .eq("mine.person_id", me.id)
+        .in("status", ["todo", "doing", "blocked"])
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(8)
+    : { data: null };
+  const tasks = normalizeTasks((me ? myTasks : openTasks) as unknown[] | null);
 
   const topTopics = (topics ?? [])
     .map((t) => ({
@@ -120,7 +131,26 @@ export default async function HomePage() {
           )}
         </section>
 
-        <aside className="flex flex-col gap-8">
+        {/* No celular vem antes das notas recentes: tarefas são o que mais se consulta na rua */}
+        <aside className="order-first flex flex-col gap-8 lg:order-none">
+          {tasks.length > 0 && (
+            <section>
+              <div className="flex items-baseline justify-between">
+                <SectionTitle>{me ? "Minhas próximas tarefas" : "Próximas tarefas"}</SectionTitle>
+                <Link href={me ? `/people/${me.slug}` : "/tasks"} className="text-sm text-muted hover:text-ink hover:underline">Todas</Link>
+              </div>
+              <div className="text-sm">
+                <TaskList tasks={tasks} showProject={false} />
+              </div>
+            </section>
+          )}
+
+          {!me && (
+            <Link href="/people" className="rounded-lg border border-dashed border-line px-4 py-3 text-sm text-muted hover:border-accent hover:text-ink">
+              Diga quem é você em <span className="font-medium text-ink">Pessoas</span>: suas tarefas aparecem aqui e você vem marcado ao criar coisas.
+            </Link>
+          )}
+
           {topTopics.length > 0 && (
             <section>
               <SectionTitle>Temas</SectionTitle>
@@ -128,18 +158,6 @@ export default async function HomePage() {
                 {topTopics.map((t) => (
                   <TopicChip key={t.id} topic={t} count={t.count} />
                 ))}
-              </div>
-            </section>
-          )}
-
-          {tasks.length > 0 && (
-            <section>
-              <div className="flex items-baseline justify-between">
-                <SectionTitle>Próximas tarefas</SectionTitle>
-                <Link href="/tasks" className="text-sm text-muted hover:text-ink hover:underline">Todas</Link>
-              </div>
-              <div className="text-sm">
-                <TaskList tasks={tasks} showProject={false} />
               </div>
             </section>
           )}

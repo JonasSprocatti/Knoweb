@@ -28,13 +28,17 @@ export default async function NotePage({
   const { data: note } = await supabase.from("notes").select("*").eq("id", id).maybeSingle();
   if (!note) notFound();
 
-  const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }] = await Promise.all([
+  const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }, { count: sugTasks }, { count: sugProjects }] = await Promise.all([
     supabase.from("audio_segments").select("*").eq("note_id", id).order("seq"),
     supabase.from("note_files").select("*").eq("note_id", id).order("created_at"),
     supabase.from("note_topics").select("relevance, source, topics(id, name, slug, color, emoji)").eq("note_id", id).order("relevance", { ascending: false }),
     supabase.from("note_links").select("target_id, kind, reason, notes!note_links_target_id_fkey(id, title)").eq("source_id", id),
     supabase.from("note_links").select("source_id, kind, reason, notes!note_links_source_id_fkey(id, title)").eq("target_id", id),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("note_id", id).eq("status", "suggested"),
+    supabase.from("project_notes").select("projects!inner(status)", { count: "exact", head: true }).eq("note_id", id).eq("projects.status", "suggested"),
   ]);
+  const pending = (note as Note).insights?.pending;
+  const toReview = (pending?.topics.length ?? 0) + (pending?.people.length ?? 0) + (sugTasks ?? 0) + (sugProjects ?? 0);
 
   type Joined = { id: string; title: string } | { id: string; title: string }[] | null;
   const one = (j: Joined) => (Array.isArray(j) ? j[0] : j);
@@ -61,6 +65,7 @@ export default async function NotePage({
       initialNote={note as Note}
       initialSegments={(segments ?? []) as AudioSegment[]}
       initialFiles={(files ?? []) as NoteFile[]}
+      toReview={toReview}
       initialTopics={noteTopics}
       linked={linked}
       startEditing={edit === "1"}

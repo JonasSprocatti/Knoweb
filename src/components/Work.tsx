@@ -238,7 +238,7 @@ export function QuickTask({
       {noteId && <input type="hidden" name="note_id" value={noteId} />}
       {parentId && <input type="hidden" name="parent_id" value={parentId} />}
       {sprintId && <input type="hidden" name="sprint_id" value={sprintId} />}
-      <input name="title" required placeholder={parentId ? "+ Subtarefa" : "+ Nova tarefa"} aria-label="Tarefa" className={`${input} min-w-48 flex-1`} />
+      <input name="title" required placeholder={parentId ? "+ Subtarefa" : "+ Nova tarefa"} aria-label="Tarefa" className={`${input} min-w-0 basis-full sm:min-w-48 sm:basis-auto sm:flex-1`} />
       {projectId ? (
         <input type="hidden" name="project_id" value={projectId} />
       ) : (
@@ -269,7 +269,7 @@ export function QuickTask({
           </option>
         ))}
       </select>
-      <button className="rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Criar</button>
+      <button className="press ml-auto rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent hover:brightness-110">Criar</button>
     </form>
   );
 }

@@ -26,7 +26,7 @@ export async function NoteWork({ supabase, noteId, pending }: { supabase: Supaba
   return (
     <>
       {(hasPending || suggestedProjects > 0 || suggestedCount > 0) && (
-        <section className="rounded-md border border-dashed border-accent/60 p-3">
+        <section id="criar" className="scroll-mt-20 rounded-md border border-dashed border-accent/60 p-3">
           <h2 className="mb-1 text-base font-semibold">O Claude quer criar</h2>
           <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Marque o que quer criar.</p>
           {hasPending && (

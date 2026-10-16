@@ -43,6 +43,7 @@ export function NoteView({
   initialNote,
   initialSegments,
   initialFiles,
+  toReview = 0,
   initialTopics,
   linked,
   startEditing,
@@ -51,6 +52,8 @@ export function NoteView({
   initialNote: Note;
   initialSegments: AudioSegment[];
   initialFiles: NoteFile[];
+  /** Quantas coisas o Claude quer criar a partir da nota (temas, pessoas, projetos, tarefas) */
+  toReview?: number;
   initialTopics: NoteTopic[];
   linked: LinkedNote[];
   startEditing: boolean;
@@ -280,6 +283,14 @@ export function NoteView({
     <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1fr)_320px]">
       {/* ===================== Coluna principal ===================== */}
       <article className="flex min-w-0 flex-col gap-5">
+        {/* No celular o painel lateral fica no fim da página: avisa em cima */}
+        {toReview > 0 && (
+          <a href="#criar" className="press flex items-center gap-2 rounded-lg border border-dashed border-accent/60 bg-panel px-3 py-2 text-sm text-ink lg:hidden">
+            <Icon name="sparkle" className="h-4 w-4 shrink-0 text-accent" />
+            O Claude quer criar {toReview} {toReview === 1 ? "coisa" : "coisas"} a partir desta nota
+            <span className="ml-auto shrink-0 font-medium text-accent">Revisar ↓</span>
+          </a>
+        )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-faint">
           <Icon name={note.kind === "recording" ? "wave" : "notes"} className={`h-4 w-4 ${note.kind === "recording" ? "text-rec" : ""}`} />
           <span>
