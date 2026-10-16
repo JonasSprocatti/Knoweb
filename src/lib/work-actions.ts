@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/supabase/server";
 import { deleteNotes } from "@/lib/server/deleteNotes";
 import { slugify } from "@/lib/text";
-import type { TemplateTask } from "@/lib/types";
+import type { Insights, TemplateTask } from "@/lib/types";
 
 /** Projetos, tarefas e pessoas: ações chamadas direto dos formulários. */
 
@@ -469,6 +469,53 @@ export async function deleteNote(id: string, form: FormData) {
   await deleteNotes(supabase, [id]);
   refresh();
   redirect("/notes");
+}
+
+/**
+ * Cria os temas e pessoas que a análise propôs e você marcou (topic / person = slug)
+ * e liga à nota. Com "discard", só limpa a proposta.
+ */
+export async function resolvePending(noteId: string, form: FormData) {
+  const supabase = await db();
+  const { data: note } = await supabase.from("notes").select("insights").eq("id", noteId).single();
+  const insights = (note?.insights ?? {}) as Insights;
+  const pending = insights.pending;
+  if (!pending) return;
+  const discard = form.has("discard");
+  const topics = discard ? [] : pending.topics.filter((t) => form.getAll("topic").includes(t.slug));
+  const people = discard ? [] : pending.people.filter((p) => form.getAll("person").includes(p.slug));
+
+  if (topics.length) {
+    must(await supabase.from("topics").upsert(
+      topics.map((t) => ({ name: t.name, slug: t.slug, description: t.description, emoji: t.emoji })),
+      { onConflict: "user_id,slug", ignoreDuplicates: true },
+    ));
+    const { data: rows } = await supabase.from("topics").select("id, slug").in("slug", topics.map((t) => t.slug));
+    const id = new Map((rows ?? []).map((r) => [r.slug as string, r.id as string]));
+    const links = topics.filter((t) => id.has(t.slug)).map((t) => ({ note_id: noteId, topic_id: id.get(t.slug)!, relevance: t.relevance, source: "ai" }));
+    if (links.length) await supabase.from("note_topics").upsert(links, { onConflict: "note_id,topic_id", ignoreDuplicates: true });
+  }
+
+  if (people.length) {
+    must(await supabase.from("people").upsert(
+      people.map((p) => ({ name: p.name, slug: p.slug })),
+      { onConflict: "user_id,slug", ignoreDuplicates: true },
+    ));
+    const { data: rows } = await supabase.from("people").select("id, slug").in("slug", people.map((p) => p.slug));
+    const id = new Map((rows ?? []).map((r) => [r.slug as string, r.id as string]));
+    const mine = people.filter((p) => id.has(p.slug));
+    await supabase.from("note_people").upsert(mine.map((p) => ({ note_id: noteId, person_id: id.get(p.slug)! })), { ignoreDuplicates: true });
+    // Só as tarefas que ainda existem (você pode ter descartado alguma)
+    const wanted = [...new Set(mine.flatMap((p) => p.task_ids))];
+    const { data: alive } = wanted.length ? await supabase.from("tasks").select("id").in("id", wanted) : { data: [] };
+    const ok = new Set((alive ?? []).map((t) => t.id as string));
+    const assignees = mine.flatMap((p) => p.task_ids.filter((t) => ok.has(t)).map((task_id) => ({ task_id, person_id: id.get(p.slug)! })));
+    if (assignees.length) await supabase.from("task_assignees").upsert(assignees, { ignoreDuplicates: true });
+  }
+
+  delete insights.pending;
+  must(await supabase.from("notes").update({ insights }).eq("id", noteId));
+  refresh();
 }
 
 export async function removeMention(noteId: string, personId: string) {

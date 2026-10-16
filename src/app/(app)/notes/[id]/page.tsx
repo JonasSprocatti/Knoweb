@@ -61,7 +61,7 @@ export default async function NotePage({
       initialTopics={noteTopics}
       linked={linked}
       startEditing={edit === "1"}
-      work={<NoteWork supabase={supabase} noteId={id} />}
+      work={<NoteWork supabase={supabase} noteId={id} pending={(note as Note).insights?.pending} />}
     />
   );
 }

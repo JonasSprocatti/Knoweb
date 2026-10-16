@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { acceptSuggested, deleteProject, removeMention, saveProject, setProjectStatus } from "@/lib/work-actions";
+import { acceptSuggested, deleteProject, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PendingCreations } from "@/lib/types";
 
 type P = { id: string; name: string; slug: string; emoji: string | null; color: string | null; status: string; reason: string | null };
 
 /** Painel da nota: projetos, tarefas e pessoas que saíram dela. */
-export async function NoteWork({ supabase, noteId }: { supabase: SupabaseClient; noteId: string }) {
+export async function NoteWork({ supabase, noteId, pending }: { supabase: SupabaseClient; noteId: string; pending?: PendingCreations }) {
   const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }] = await Promise.all([
     supabase.from("project_notes").select("projects(id, name, slug, emoji, color, status, reason)").eq("note_id", noteId),
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
@@ -19,8 +20,62 @@ export async function NoteWork({ supabase, noteId }: { supabase: SupabaseClient;
   const mentioned = (np ?? []).map((r) => one(r.people as unknown as { id: string; name: string; slug: string } | null)).filter((p) => !!p);
   const suggestedCount = tasks.filter((t) => t.status === "suggested").length;
 
+  const suggestedProjects = linked.filter((p) => p.status === "suggested").length;
+  const hasPending = !!pending && pending.topics.length + pending.people.length > 0;
+
   return (
     <>
+      {(hasPending || suggestedProjects > 0 || suggestedCount > 0) && (
+        <section className="rounded-md border border-dashed border-accent/60 p-3">
+          <h2 className="mb-1 text-base font-semibold">O Claude quer criar</h2>
+          <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Marque o que quer criar.</p>
+          {hasPending && (
+            <form action={resolvePending.bind(null, noteId)} className="flex flex-col gap-2 text-sm">
+              {pending!.topics.length > 0 && (
+                <fieldset className="flex flex-col gap-1">
+                  <legend className="mb-1 text-xs font-medium text-muted">Temas novos</legend>
+                  {pending!.topics.map((t) => (
+                    <label key={t.slug} className="flex cursor-pointer items-start gap-2">
+                      <input type="checkbox" name="topic" value={t.slug} defaultChecked className="mt-1 accent-accent" />
+                      <span>
+                        {t.emoji} {t.name}
+                        {t.description && <span className="block text-xs text-faint">{t.description}</span>}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              {pending!.people.length > 0 && (
+                <fieldset className="flex flex-col gap-1">
+                  <legend className="mb-1 text-xs font-medium text-muted">Pessoas novas</legend>
+                  {pending!.people.map((p) => (
+                    <label key={p.slug} className="flex cursor-pointer items-center gap-2">
+                      <input type="checkbox" name="person" value={p.slug} defaultChecked className="accent-accent" />
+                      <span>
+                        {p.name}
+                        {p.task_ids.length > 0 && <span className="text-xs text-faint"> · em {p.task_ids.length} {p.task_ids.length === 1 ? "tarefa" : "tarefas"}</span>}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              <div className="flex gap-2">
+                <button className="rounded bg-accent px-2.5 py-0.5 text-xs font-semibold text-on-accent">Criar marcados</button>
+                <button name="discard" value="1" className="px-2 py-0.5 text-xs text-muted hover:text-ink">Descartar</button>
+              </div>
+            </form>
+          )}
+          {(suggestedProjects > 0 || suggestedCount > 0) && (
+            <p className={`text-xs text-muted ${hasPending ? "mt-3" : ""}`}>
+              {[suggestedProjects && `${suggestedProjects} ${suggestedProjects === 1 ? "projeto" : "projetos"}`, suggestedCount && `${suggestedCount} ${suggestedCount === 1 ? "tarefa" : "tarefas"}`]
+                .filter(Boolean)
+                .join(" e ")}{" "}
+              {suggestedProjects + suggestedCount === 1 ? "sugerido" : "sugeridos"}: confirme ou descarte em Projetos e Tarefas logo abaixo.
+            </p>
+          )}
+        </section>
+      )}
+
       <section>
         <h2 className="mb-2 text-base font-semibold">Projetos</h2>
         <ul className="flex flex-col gap-2 text-sm">

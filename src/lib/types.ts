@@ -7,6 +7,13 @@ export interface Insights {
   decisions?: string[];
   people?: string[];
   questions?: string[];
+  /** O que a análise quer criar e espera você confirmar na nota */
+  pending?: PendingCreations;
+}
+
+export interface PendingCreations {
+  topics: { name: string; slug: string; description: string; emoji: string | null; relevance: number }[];
+  people: { name: string; slug: string; task_ids: string[] }[];
 }
 
 export interface Note {

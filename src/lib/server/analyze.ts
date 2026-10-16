@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { anthropic, clip, CLAUDE_MODEL } from "@/lib/server/claude";
 import { aiProvider, gemini } from "@/lib/server/gemini";
 import { slugify } from "@/lib/text";
-import type { Insights } from "@/lib/types";
+import type { Insights, PendingCreations } from "@/lib/types";
 
 interface AnalysisResult {
   title: string;
@@ -219,22 +219,22 @@ Analise a nota e chame a ferramenta salvar_analise.`;
 
     let topicIdBySlug = new Map<string, string>();
     if (uniqueWanted.length) {
-      const slugs = uniqueWanted.map((t) => t.slug);
-      const { data: existing } = await supabase.from("topics").select("id, slug").in("slug", slugs);
+      const { data: existing } = await supabase.from("topics").select("id, slug").in("slug", uniqueWanted.map((t) => t.slug));
       topicIdBySlug = new Map((existing ?? []).map((t) => [t.slug as string, t.id as string]));
-
-      const missing = uniqueWanted.filter((t) => !topicIdBySlug.has(t.slug));
-      if (missing.length) {
-        const { data: created } = await supabase
-          .from("topics")
-          .upsert(
-            missing.map((t) => ({ name: t.name, slug: t.slug, description: t.description, emoji: t.emoji?.trim().slice(0, 8) || null })),
-            { onConflict: "user_id,slug" },
-          )
-          .select("id, slug");
-        for (const t of created ?? []) topicIdBySlug.set(t.slug as string, t.id as string);
-      }
     }
+    // Temas novos não são criados aqui: ficam pendentes até você confirmar na nota
+    const pending: PendingCreations = {
+      topics: uniqueWanted
+        .filter((t) => !topicIdBySlug.has(t.slug))
+        .map((t) => ({
+          name: t.name,
+          slug: t.slug,
+          description: t.description ?? "",
+          emoji: t.emoji?.trim().slice(0, 8) || null,
+          relevance: Math.min(1, Math.max(0, Number(t.relevance) || 0.5)),
+        })),
+      people: [],
+    };
 
     await supabase.from("note_topics").delete().eq("note_id", noteId).eq("source", "ai");
     const topicRows = uniqueWanted
@@ -261,7 +261,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       await supabase.from("note_links").upsert(linkRows, { onConflict: "source_id,target_id,kind" });
     }
 
-    await linkWork(supabase, noteId, result, projects ?? [], people ?? []);
+    pending.people = await linkWork(supabase, noteId, result, projects ?? [], people ?? []);
 
     // ---- Nota --------------------------------------------------------
     const insights: Insights = {
@@ -270,6 +270,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       decisions: result.decisions ?? [],
       people: result.people ?? [],
       questions: result.questions ?? [],
+      ...(pending.topics.length || pending.people.length ? { pending } : {}),
     };
     const update: Record<string, unknown> = {
       summary: result.summary,
@@ -294,10 +295,10 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
 const RECURRENCES = new Set(["daily", "weekdays", "weekly", "biweekly", "monthly"]);
 
-/** Cria o que faltar (sem tocar no que já existe) e devolve id por slug. */
+/** Cria o que faltar (sem tocar no que já existe) e devolve id por slug. Só para projetos (que entram como sugestão). */
 async function ensure(
   supabase: SupabaseClient,
-  table: "people" | "projects",
+  table: "projects",
   known: Row[],
   wanted: { name: string; slug: string; extra?: Record<string, unknown> }[],
 ) {
@@ -316,8 +317,9 @@ async function ensure(
 
 /**
  * Pessoas, projetos e tarefas da nota. Projetos novos entram como "suggested"
- * e tarefas como "suggested": você aceita ou descarta. Reanalisar troca só as
- * sugestões que ainda não foram aceitas.
+ * e tarefas como "suggested": você aceita ou descarta. Pessoas novas não são
+ * criadas: voltam como pendentes (com as tarefas em que entrariam). Reanalisar
+ * troca só as sugestões que ainda não foram aceitas.
  */
 async function linkWork(supabase: SupabaseClient, noteId: string, result: AnalysisResult, projects: Row[], people: Row[]) {
   const items = (result.action_items ?? []).filter((a) => a.text?.trim());
@@ -326,7 +328,12 @@ async function linkWork(supabase: SupabaseClient, noteId: string, result: Analys
   const names = [...(result.people ?? []), ...items.flatMap((a) => a.assignees ?? (a.owner ? [a.owner] : []))]
     .map((n) => n.trim())
     .filter(Boolean);
-  const personId = await ensure(supabase, "people", people, names.map((name) => ({ name, slug: slugify(name) })).filter((p) => p.slug));
+  const personId = new Map(people.map((p) => [p.slug, p.id]));
+  const newPeople = new Map<string, { name: string; slug: string; task_ids: string[] }>();
+  for (const name of names) {
+    const slug = slugify(name);
+    if (slug && !personId.has(slug) && !newPeople.has(slug)) newPeople.set(slug, { name, slug, task_ids: [] });
+  }
   await supabase.from("note_people").delete().eq("note_id", noteId);
   const mentioned = [...new Set(names.map((n) => personId.get(slugify(n))).filter((id): id is string => !!id))];
   if (mentioned.length) await supabase.from("note_people").insert(mentioned.map((person_id) => ({ note_id: noteId, person_id })));
@@ -370,7 +377,7 @@ async function linkWork(supabase: SupabaseClient, noteId: string, result: Analys
   const onlyProject = projectRows.length === 1 ? projectRows[0].project_id : null;
 
   const fresh = items.filter((a) => !keptTitles.has(a.text.trim().toLowerCase()));
-  if (!fresh.length) return;
+  if (!fresh.length) return [...newPeople.values()];
   const { data: created } = await supabase
     .from("tasks")
     .insert(
@@ -390,10 +397,12 @@ async function linkWork(supabase: SupabaseClient, noteId: string, result: Analys
     .select("id");
   const assignees = (created ?? []).flatMap((t, i) => {
     const who = fresh[i].assignees?.length ? fresh[i].assignees! : fresh[i].owner ? [fresh[i].owner!] : [];
+    for (const n of who) newPeople.get(slugify(n))?.task_ids.push(t.id as string);
     return [...new Set(who.map((n) => personId.get(slugify(n))).filter((id): id is string => !!id))].map((person_id) => ({
       task_id: t.id as string,
       person_id,
     }));
   });
   if (assignees.length) await supabase.from("task_assignees").insert(assignees);
+  return [...newPeople.values()];
 }
