@@ -25,6 +25,8 @@ const csp = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Telas já visitadas voltam na hora (o servidor revalida depois de salvar algo)
+  experimental: { staleTimes: { dynamic: 30, static: 180 } },
   // O navegador sempre pede /favicon.ico; o ícone do app é o SVG
   async rewrites() {
     return [{ source: "/favicon.ico", destination: "/icon.svg" }];
