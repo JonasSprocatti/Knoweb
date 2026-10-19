@@ -187,10 +187,18 @@ export function GraphView() {
     [raw],
   );
   // Ao trocar o foco, enquadra o que sobrou depois que a simulação assentar
+  // (e de novo quando ela parar: em aparelho lento ela ainda está se espalhando aos 900 ms)
+  const fitted = useRef(false);
   useEffect(() => {
+    fitted.current = false;
     const t = setTimeout(() => fgRef.current?.zoomToFit?.(600, 60), 900);
     return () => clearTimeout(t);
   }, [focus, types]);
+  const fitOnce = () => {
+    if (fitted.current) return;
+    fitted.current = true;
+    fgRef.current?.zoomToFit?.(500, 60);
+  };
   const toggleType = (t: NodeType) => setTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t]);
   const filtered = types.length < ALL_TYPES.length || !!focus || hideOrphans || !showAi;
 
@@ -377,6 +385,7 @@ export function GraphView() {
             backgroundColor={theme.bg}
             nodeId="id"
             cooldownTicks={140}
+            onEngineStop={fitOnce}
             autoPauseRedraw={!(theme.animated && !reduced)}
             linkCurvature={theme.curvature}
             linkColor={(l: SimLink) => theme.linkColor(l, !hover || idOf(l.source) === hover || idOf(l.target) === hover)}
