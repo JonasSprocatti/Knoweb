@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteProject, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { one, PROJECT_STATUS, Progress, projectColor, formatDay, Timeline, today } from "@/components/Work";

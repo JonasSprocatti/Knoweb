@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { unlinkEntity, acceptSuggested, deleteProject, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";

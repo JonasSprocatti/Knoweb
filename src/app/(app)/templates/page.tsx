@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SaveButton } from "@/components/SaveButton";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteTemplate, saveTemplate } from "@/lib/work-actions";

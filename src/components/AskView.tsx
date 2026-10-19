@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
 

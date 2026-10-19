@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { SaveButton } from "@/components/SaveButton";
 import { StatusPicker } from "@/components/StatusPicker";
 import { TASK_STATUS } from "@/lib/taskStatus";
@@ -105,15 +105,15 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
   const overdue = task.due_date && isOpen(task.status) && task.due_date < today();
   return (
     <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 transition-opacity last:border-0 ${task.status === "done" || task.status === "canceled" ? "opacity-70" : ""}`}>
-      {/* No celular o título ocupa a linha inteira; as etiquetas vão para a linha de baixo */}
-      <span className="flex min-w-0 basis-full items-center gap-3 sm:basis-0 sm:flex-1">
+      {/* Em lista estreita (celular, coluna lateral) o título ocupa a linha inteira; as etiquetas vão para a linha de baixo */}
+      <span className="flex min-w-0 basis-full items-center gap-3 @lg:basis-0 @lg:flex-1">
         <StatusDot status={task.status} />
         <Link href={`/tasks/${task.id}`} className={`min-w-0 flex-1 ${task.status === "done" ? "text-faint line-through" : "text-ink"} hover:underline`}>
           <span className="mr-2 text-xs tabular-nums text-faint">{taskCode(task.number)}</span>
           {task.title}
         </Link>
       </span>
-      <span className="w-2.5 sm:hidden" aria-hidden />
+      <span className="w-2.5 @lg:hidden" aria-hidden />
       {showProject && task.projects && (
         <Link href={`/projects/${task.projects.slug}`} className="flex items-center gap-1 text-xs text-muted hover:text-ink">
           <span className="h-2 w-2 rounded-full" style={{ background: projectColor(task.projects) }} aria-hidden />
@@ -154,7 +154,7 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
 export function TaskList({ tasks, showProject, empty }: { tasks: TaskRow[]; showProject?: boolean; empty?: string }) {
   if (!tasks.length) return <p className="py-3 text-sm text-faint">{empty ?? "Nenhuma tarefa."}</p>;
   return (
-    <ul className="flex flex-col">
+    <ul className="@container flex flex-col">
       {tasks.map((t) => (
         <TaskItem key={t.id} task={t} showProject={showProject} />
       ))}
@@ -246,7 +246,7 @@ export function Timeline({ items }: { items: { id: string; label: string; href: 
   );
 }
 
-const input = "rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
+const input = "max-w-full rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none";
 
 /** Criação rápida de tarefa: título, projeto, responsáveis, prazo e estimativa. */
 export function QuickTask({

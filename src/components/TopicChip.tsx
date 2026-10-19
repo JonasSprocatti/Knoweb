@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { topicColor } from "@/lib/topicColor";
 
 /** Tema com a sua cor: o ponto colorido carrega a cor, o texto fica legível nos dois modos. */

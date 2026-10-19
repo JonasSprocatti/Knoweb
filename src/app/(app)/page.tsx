@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { QuickCapture } from "@/components/QuickCapture";
 import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { saveSprint } from "@/lib/work-actions";
 import { formatDay, hours, Progress, today } from "@/components/Work";

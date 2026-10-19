@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Person } from "@/lib/types";
+import { Icon } from "@/components/Icon";
 
 /** Responsáveis de uma tarefa nova: caixinhas num menu, com você já marcado. */
 export function AssigneePicker({ people, className = "" }: { people: Pick<Person, "id" | "name" | "is_me">[]; className?: string }) {
@@ -29,7 +30,7 @@ export function AssigneePicker({ people, className = "" }: { people: Pick<Person
   return (
     <details ref={ref} className={`relative ${className}`}>
       <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink hover:border-accent [&::-webkit-details-marker]:hidden">
-        <span aria-hidden>👤</span>
+        <Icon name="user" className="h-4 w-4 text-faint" />
         <span className="max-w-40 truncate">{names.length ? names.join(", ") : "Sem responsável"}</span>
         <span className="text-faint" aria-hidden>▾</span>
       </summary>

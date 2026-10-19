@@ -163,6 +163,8 @@ main li:nth-child(4) { animation-delay: 0.09s; }
 main li:nth-child(5) { animation-delay: 0.12s; }
 main li:nth-child(6) { animation-delay: 0.15s; }
 main li:nth-child(n + 7) { animation-delay: 0.18s; }
+/* Itens de texto (markdown) não entram em cascata: a nota aparece inteira */
+main .md li { animation: none; }
 
 /* Cartões e linhas clicáveis "levantam" um pouco no mouse */
 @media (hover: hover) {
@@ -378,4 +380,22 @@ dialog[open]::backdrop {
 .md input[type="checkbox"] {
   margin-right: 0.4em;
   accent-color: var(--accent);
+}
+
+/* Barra fina no topo enquanto a próxima tela carrega (components/Link.tsx).
+   Só aparece se demorar mais que um piscar, para não "piscar" à toa. */
+@keyframes nav-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(0.85); }
+}
+html[data-nav] body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 60;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  transform-origin: left;
+  animation: nav-progress 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) 0.12s both;
 }

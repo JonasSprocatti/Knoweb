@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { NoteCard } from "@/components/NoteCard";
 import type { NoteListItem } from "@/lib/types";

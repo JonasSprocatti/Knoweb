@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Calendar, normalizeTasks, PRIORITY, QuickTask, TASK_COLUMNS, TaskBoard, TaskList, today } from "@/components/Work";
 

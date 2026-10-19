@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { linkSystem, unlinkSystem } from "@/lib/work-actions";
 import { ENTITY } from "@/lib/entities";
