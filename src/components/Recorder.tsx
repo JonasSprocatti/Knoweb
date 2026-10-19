@@ -394,8 +394,9 @@ export function Recorder({ userId }: { userId: string }) {
           setTitle(e.target.value);
           if (noteId) saveNotes(noteId, { title: e.target.value, content: liveNotes });
         }}
-        placeholder="Sobre o que é esta conversa? (opcional — o Claude dá um título depois)"
-        className="w-full border-0 border-b border-line bg-transparent pb-2 text-xl font-semibold text-ink placeholder:text-faint focus:border-accent focus:outline-none"
+        placeholder="Assunto da conversa (opcional)"
+        title="Opcional: o Claude dá um título depois"
+        className="w-full border-0 border-b border-line bg-transparent pb-2 text-lg font-semibold md:text-xl text-ink placeholder:text-faint focus:border-accent focus:outline-none"
       />
 
       <section className="flex flex-col items-center gap-5 rounded-lg bg-panel px-6 py-10">

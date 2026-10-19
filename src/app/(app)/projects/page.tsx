@@ -153,7 +153,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
                   <li key={p.id} className="border-b border-line last:border-0">
                     <Link href={`/projects/${p.slug}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 py-3">
                       <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: projectColor(p) }} aria-hidden />
-                      <span className="min-w-0 flex-1">
+                      <span className="min-w-0 flex-[1_1_16rem]">
                         <span className="block font-medium text-ink">{p.emoji} {p.name}</span>
                         {p.description && <span className="line-clamp-1 text-sm text-muted">{p.description}</span>}
                       </span>

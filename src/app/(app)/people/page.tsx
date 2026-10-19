@@ -69,7 +69,7 @@ export default async function PeoplePage() {
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface text-sm font-semibold text-muted" aria-hidden>
                   {p.name.slice(0, 1).toUpperCase()}
                 </span>
-                <span className="min-w-0 flex-1">
+                <span className="min-w-0 flex-[1_1_12rem]">
                   <span className="block font-medium text-ink">
                     {p.name}
                     {p.is_me && <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">Você</span>}

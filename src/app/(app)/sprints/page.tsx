@@ -53,7 +53,7 @@ export default async function SprintsPage() {
               {group.map((s) => (
                 <li key={s.id} className="border-b border-line last:border-0">
                   <Link href={`/sprints/${s.id}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 py-3">
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-[1_1_16rem]">
                       <span className="block font-medium text-ink">{s.name}</span>
                       {s.goal && <span className="line-clamp-1 text-sm text-muted">{s.goal}</span>}
                     </span>
