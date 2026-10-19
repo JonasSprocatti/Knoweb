@@ -68,11 +68,13 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       <QuickTask projects={projects ?? []} people={people ?? []} />
 
       <div className="flex flex-wrap items-center gap-1.5 text-sm">
-        {Object.entries(STATES).map(([k, label]) => (
-          <Link key={k} href={href({ estado: k })} className={`rounded-md px-3 py-1 ${estado === k ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}>
-            {label}
-          </Link>
-        ))}
+        <div className="chips max-w-full">
+          {Object.entries(STATES).map(([k, label]) => (
+            <Link key={k} href={href({ estado: k })} className={`rounded-md px-3 py-1 ${estado === k ? "bg-ink text-bg" : "text-muted hover:text-ink"}`}>
+              {label}
+            </Link>
+          ))}
+        </div>
         <form className="ml-auto flex flex-wrap gap-2">
           <input type="hidden" name="estado" value={estado} />
           <input type="hidden" name="visao" value={visao} />

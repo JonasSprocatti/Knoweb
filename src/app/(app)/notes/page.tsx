@@ -40,7 +40,8 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
         <NewNoteButton />
       </header>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <div className="chips">
         {FILTERS.map((f) => (
           <Link
             key={f.key}
@@ -51,7 +52,8 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
             {f.label}
           </Link>
         ))}
-        <span className="ml-auto self-center text-faint">
+        </div>
+        <span className="ml-auto shrink-0 self-center text-faint">
           {count ?? 0} {count === 1 ? "nota" : "notas"}
         </span>
       </div>

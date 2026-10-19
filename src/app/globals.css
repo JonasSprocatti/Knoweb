@@ -399,3 +399,19 @@ html[data-nav] body::before {
   transform-origin: left;
   animation: nav-progress 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) 0.12s both;
 }
+
+/* Fileira de filtros: no celular rola de lado em vez de quebrar uma palavra sozinha na linha de baixo */
+.chips {
+  display: flex;
+  min-width: 0;
+  gap: 0.375rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.chips::-webkit-scrollbar {
+  display: none;
+}
+.chips > * {
+  flex-shrink: 0;
+}
