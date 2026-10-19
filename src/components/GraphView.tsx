@@ -312,9 +312,9 @@ export function GraphView() {
                   <button
                     key={t.id}
                     role="radio"
-                    aria-checked={themeId === t.id}
+                    aria-checked={theme.id === t.id}
                     onClick={() => setThemeId(t.id)}
-                    className={`rounded px-2.5 py-1 transition ${themeId === t.id ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
+                    className={`rounded px-2.5 py-1 transition ${theme.id === t.id ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
                   >
                     {t.name}
                   </button>
@@ -392,7 +392,7 @@ export function GraphView() {
             onNodeClick={openNode}
             onRenderFramePre={(ctx: CanvasRenderingContext2D, scale: number) => {
               const t = reduced ? 0 : performance.now();
-              theme.backdrop(ctx, t, scale);
+              theme.backdrop(ctx, t, scale, data.nodes);
               if (!clouds) return;
               // Nuvem na cor do tema em volta de cada ponto: grupos do mesmo tema viram nebulosas
               ctx.save();
@@ -416,7 +416,8 @@ export function GraphView() {
               ctx.save();
               theme.node(ctx, node, { r, lit, hovered: hover === node.id, scale, t: reduced ? 0 : performance.now(), font });
 
-              const img = node.image ? images.current.get(node.image) : undefined;
+              const own = !!theme.ownLabel?.(node);
+              const img = node.image && !own ? images.current.get(node.image) : undefined;
               if (img?.complete && img.naturalWidth) {
                 const side = Math.min(img.naturalWidth, img.naturalHeight);
                 ctx.save();
@@ -430,14 +431,14 @@ export function GraphView() {
                 ctx.strokeStyle = node.color;
                 ctx.lineWidth = Math.max(1, r * 0.12);
                 ctx.stroke();
-              } else if (isHub(node) && node.emoji && !(node.type === "topic" && theme.topicIsLabel)) {
+              } else if (isHub(node) && node.emoji && !own) {
                 ctx.font = `${r * 1.1}px ${font}`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
                 ctx.fillText(node.emoji, x, y + r * 0.05);
               }
 
-              if (hover === node.id) {
+              if (hover === node.id && !own) {
                 ctx.beginPath();
                 ctx.arc(x, y, r + 2.5 / scale, 0, Math.PI * 2);
                 ctx.strokeStyle = theme.label;
@@ -445,8 +446,7 @@ export function GraphView() {
                 ctx.stroke();
               }
 
-              const isTopicLabel = node.type === "topic" && theme.topicIsLabel;
-              const showLabel = !isTopicLabel && (isHub(node) ? scale > 1.5 || topHubs.has(node.id) || hover === node.id : scale > 1.6 || hover === node.id || (hover && lit));
+              const showLabel = !own && (isHub(node) ? scale > 1.5 || topHubs.has(node.id) || hover === node.id : scale > 1.6 || hover === node.id || (hover && lit));
               if (showLabel) {
                 const fontSize = (isHub(node) ? 13 : 11) / scale;
                 ctx.font = `${isHub(node) ? 650 : 450} ${fontSize}px ${font}`;
@@ -465,6 +465,7 @@ export function GraphView() {
             }}
             nodePointerAreaPaint={(node: SimNode, color: string, ctx: CanvasRenderingContext2D) => {
               ctx.fillStyle = color;
+              if (theme.ownLabel?.(node) && theme.hit) return theme.hit(ctx, node, radius(node), font);
               ctx.beginPath();
               ctx.arc(node.x ?? 0, node.y ?? 0, radius(node) + 4, 0, 2 * Math.PI);
               ctx.fill();

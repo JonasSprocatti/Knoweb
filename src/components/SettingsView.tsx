@@ -42,7 +42,7 @@ export function SettingsView() {
       <header className="flex items-end justify-between gap-3">
         <div>
           <h1 className="display text-3xl md:text-4xl">Configurações</h1>
-          <p className="mt-1 text-muted">Ajustes visuais deste aparelho. Mudam na hora.</p>
+          <p className="mt-1 text-muted">Ajustes deste aparelho. Mudam na hora.</p>
         </div>
         {saved && (
           <span className="pop rounded-full bg-[#2F9D6B]/15 px-3 py-1 text-sm font-medium text-[#2F9D6B]" role="status">
@@ -106,6 +106,8 @@ export function SettingsView() {
         />
       </Section>
 
+      <Notifications />
+
       <section className="rounded-lg border border-line bg-panel p-4">
         <p className="mb-3 text-sm text-muted">Prévia</p>
         <div className="flex flex-wrap items-center gap-3">
@@ -115,6 +117,91 @@ export function SettingsView() {
         </div>
       </section>
     </div>
+  );
+}
+
+const isNativeApp = () => typeof window !== "undefined" && "Capacitor" in window;
+const VAPID = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
+const vapidBytes = (b64: string) => Uint8Array.from(atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+
+/** Resumo diário (vencidas, perto do prazo, sprints, sugestões…) neste aparelho, via Web Push. */
+function Notifications() {
+  const [state, setState] = useState<"loading" | "native" | "unsupported" | "denied" | "off" | "on">("loading");
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    if (isNativeApp()) return setState("native");
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !VAPID) return setState("unsupported");
+    if (Notification.permission === "denied") return setState("denied");
+    navigator.serviceWorker.getRegistration().then(async (reg) => setState((await reg?.pushManager.getSubscription()) ? "on" : "off"));
+  }, []);
+
+  async function turnOn() {
+    setMsg("");
+    if ((await Notification.requestPermission()) !== "granted") return setState("denied");
+    try {
+      const reg = (await navigator.serviceWorker.getRegistration()) ?? (await navigator.serviceWorker.register("/sw.js"));
+      await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes(VAPID) });
+      const res = await fetch("/api/push", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sub) });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? "O servidor recusou.");
+      setState("on");
+    } catch (e) {
+      setMsg(`Não deu para ligar: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  async function turnOff() {
+    const sub = await (await navigator.serviceWorker.getRegistration())?.pushManager.getSubscription();
+    if (sub) {
+      await fetch("/api/push", { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) });
+      await sub.unsubscribe();
+    }
+    setState("off");
+  }
+
+  async function test() {
+    setMsg("Enviando…");
+    const res = await fetch("/api/notifications", { method: "POST" });
+    const j = await res.json().catch(() => ({}));
+    setMsg(res.ok ? `Enviado para ${j.sent} aparelho${j.sent === 1 ? "" : "s"}.` : `Falhou: ${j.error ?? res.status}`);
+  }
+
+  const hint = {
+    loading: "",
+    native: "No app Android o resumo já vem ligado e chega por volta das 8h. Para silenciar, desligue o canal “Resumo diário” nas configurações do Android.",
+    unsupported: "Este navegador não recebe notificações. No iPhone, adicione o Knoweb à tela inicial (Compartilhar → Adicionar à Tela de Início) e abra por lá.",
+    denied: "As notificações estão bloqueadas para este site. Libere nas configurações do navegador e volte aqui.",
+    off: "Uma vez por dia, de manhã: tarefas vencidas e perto do prazo, sprints e projetos terminando, trabalho parado, sugestões do Claude e gravações com erro.",
+    on: "Ligado neste aparelho. O resumo chega por volta das 8h, só quando há algo pendente.",
+  }[state];
+
+  return (
+    <Section title="Notificações" hint={hint}>
+      {(state === "off" || state === "on") && (
+        <div className="flex flex-wrap items-center gap-2">
+          {state === "off" ? (
+            <button onClick={turnOn} className="press rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent">
+              Ligar neste aparelho
+            </button>
+          ) : (
+            <>
+              <button onClick={test} className="press rounded-md bg-accent px-4 py-1.5 text-sm font-semibold text-on-accent">
+                Mandar resumo agora
+              </button>
+              <button onClick={turnOff} className="press rounded-md border border-line px-4 py-1.5 text-sm text-muted hover:text-ink">
+                Desligar neste aparelho
+              </button>
+            </>
+          )}
+        </div>
+      )}
+      {msg && (
+        <p className="text-sm text-muted" role="status">
+          {msg}
+        </p>
+      )}
+    </Section>
   );
 }
 

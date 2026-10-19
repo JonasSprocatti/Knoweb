@@ -171,3 +171,12 @@ src/app/w/[title]/           destino dos [[wikilinks]] (cria a nota se não exis
 src/lib/server/              Claude (análise), Whisper (transcrição), wikilinks
 src/components/              gravador, editor, nota, transcrição, grafo, chat
 ```
+
+## Notificações (resumo diário)
+
+Uma vez por dia, por volta das 8h (horário de Brasília), o Knoweb manda um resumo só quando há algo pendente: tarefas vencidas, que vencem hoje ou nos próximos 2 dias, sprints terminando, projetos com prazo na semana, tarefas paradas em Fazendo há mais de 7 dias, sugestões do Claude para revisar e gravações com erro.
+
+- **Desktop e celular (navegador/PWA)**: Configurações → Notificações → *Ligar neste aparelho*. No iPhone, só funciona com o Knoweb adicionado à tela inicial.
+- **App Android**: já vem ligado (um alarme diário busca o resumo com a sua sessão; não usa Firebase).
+
+Para funcionar na Vercel, cadastre `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (gere com `npx web-push generate-vapid-keys`), `SUPABASE_SERVICE_ROLE_KEY` e `CRON_SECRET`, e rode de novo o `supabase/schema.sql` (cria `push_subscriptions`). O cron está em `vercel.json`.

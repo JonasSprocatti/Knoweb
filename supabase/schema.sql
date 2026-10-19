@@ -638,3 +638,18 @@ create index if not exists entity_links_target_idx on public.entity_links (targe
 alter table public.entity_links enable row level security;
 drop policy if exists "own_rows" on public.entity_links;
 create policy "own_rows" on public.entity_links for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Notificações: aparelhos (navegador/PWA) que recebem o resumo diário
+-- ---------------------------------------------------------------------
+create table if not exists public.push_subscriptions (
+  endpoint      text primary key,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  p256dh        text not null,
+  auth          text not null,
+  created_at    timestamptz not null default now()
+);
+create index if not exists push_subscriptions_user_idx on public.push_subscriptions (user_id);
+alter table public.push_subscriptions enable row level security;
+drop policy if exists "own_rows" on public.push_subscriptions;
+create policy "own_rows" on public.push_subscriptions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
