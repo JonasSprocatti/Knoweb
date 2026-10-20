@@ -550,6 +550,16 @@ export async function resolvePending(noteId: string, form: FormData) {
   refresh();
 }
 
+/**
+ * Notas que citam um nome (para "Reanalisar notas"). Usa o índice de palavras direto,
+ * sem o trecho destacado do search_notes, que é caro em gravações longas.
+ */
+export async function notesCiting(name: string) {
+  const supabase = await db();
+  const { data } = await supabase.from("notes").select("id").textSearch("search", name, { type: "websearch", config: "portuguese" }).is("merged_into", null).limit(6);
+  return (data ?? []).map((r) => r.id as string);
+}
+
 export async function removeMention(noteId: string, personId: string) {
   const supabase = await db();
   must(await supabase.from("note_people").delete().eq("note_id", noteId).eq("person_id", personId));

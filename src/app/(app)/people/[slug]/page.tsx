@@ -29,8 +29,6 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
     supabase.from("projects").select("id, name, slug, emoji, color, status").eq("owner_id", person.id),
     supabase.from("entities").select("id, name, slug").eq("kind", "company").order("name"),
   ]);
-  // Notas que citam o nome, para "Reanalisar notas" (além das já ligadas)
-  const { data: cited } = await supabase.rpc("search_notes", { q: person.name, max_results: 6 });
   const company = (companies ?? []).find((c) => c.id === person.company_id);
 
   const tasks = normalizeTasks(taskRows as unknown[] | null).filter((t) => t.status !== "canceled");
@@ -200,7 +198,7 @@ export default async function PersonPage({ params }: { params: Promise<{ slug: s
         <section>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Aparece em</h2>
-            <ReanalyzeNotes what="esta pessoa" noteIds={[...new Set([...notes.map((n) => n.id), ...((cited ?? []) as { id: string }[]).map((n) => n.id)])].slice(0, 10)} />
+            <ReanalyzeNotes what="esta pessoa" noteIds={notes.map((n) => n.id)} name={person.name} />
           </div>
           {notes.length === 0 ? (
             <p className="text-faint">Nenhuma nota cita esta pessoa.</p>

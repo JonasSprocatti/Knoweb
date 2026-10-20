@@ -58,8 +58,6 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     supabase.from("projects").select("id, name, emoji").neq("status", "archived").order("name"),
     supabase.from("notes").select("id, title").order("updated_at", { ascending: false }).limit(60),
   ]);
-  // Notas que citam o projeto, para "Reanalisar notas" (além das já ligadas)
-  const { data: cited } = await supabase.rpc("search_notes", { q: project.name, max_results: 6 });
 
   const tasks = normalizeTasks(taskRows);
   const suggested = tasks.filter((t) => t.status === "suggested");
@@ -313,7 +311,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               <button className="rounded-md bg-surface px-3 text-sm text-muted hover:text-ink">Ligar</button>
             </form>
             <div className="mt-3">
-              <ReanalyzeNotes what="este projeto" noteIds={[...new Set([...notes.map((n) => n.id), ...((cited ?? []) as { id: string }[]).map((n) => n.id)])].slice(0, 10)} />
+              <ReanalyzeNotes what="este projeto" noteIds={notes.map((n) => n.id)} name={project.name} />
             </div>
           </section>
 
