@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
@@ -138,10 +139,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
             <form action={saveProject} className="mt-3 flex flex-col gap-2">
               <input type="hidden" name="id" value={project.id} />
               <div className="flex gap-2">
-                <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+                <div className="flex w-16 flex-col gap-1 text-xs text-muted" title="Um emoji que aparece ao lado do nome e na teia">
                   Ícone
-                  <input name="emoji" defaultValue={project.emoji ?? ""} placeholder="📁" maxLength={8} title="Um emoji que aparece ao lado do nome e na teia" className={`${input} text-center`} />
-                </label>
+                  <EmojiPicker defaultValue={project.emoji} placeholder="📁" label="Ícone" />
+                </div>
                 <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
                   Nome
                   <input name="name" required defaultValue={project.name} className={input} />

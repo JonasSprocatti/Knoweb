@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { NoteCard } from "@/components/NoteCard";
@@ -67,10 +68,10 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
           <summary className="cursor-pointer font-semibold">Editar tema</summary>
           <form action={saveTopic.bind(null, topic.id)} className="mt-3 flex flex-col gap-2 text-sm">
             <div className="flex gap-2">
-              <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+              <div className="flex w-16 flex-col gap-1 text-xs text-muted">
                 Emoji
-                <input name="emoji" defaultValue={topic.emoji ?? ""} maxLength={8} placeholder="🏷️" className="rounded-md border border-line bg-panel px-2 py-1.5 text-center text-sm" />
-              </label>
+                <EmojiPicker defaultValue={topic.emoji} placeholder="🏷️" />
+              </div>
               <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-muted">
                 Nome
                 <input name="name" required defaultValue={topic.name} className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink" />
