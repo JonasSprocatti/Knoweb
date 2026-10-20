@@ -10,7 +10,10 @@ const ALLOWED = (process.env.ALLOWED_EMAILS ?? "")
   .filter(Boolean);
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Só os cabeçalhos seguem adiante (com os cookies renovados), nunca a requisição inteira:
+  // recriar a resposta com o corpo de um POST (envio de formulário) travava o middleware
+  // por 25 s (504) quando o login era renovado bem naquele envio.
+  let response = NextResponse.next({ request: { headers: request.headers } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,7 +25,7 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: request.headers } });
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
         },
       },
