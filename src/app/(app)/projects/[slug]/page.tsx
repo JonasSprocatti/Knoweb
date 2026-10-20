@@ -1,5 +1,7 @@
 import Link from "@/components/Link";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { PersonSelect } from "@/components/PersonSelect";
+import { ReanalyzeNotes } from "@/components/ReanalyzeNotes";
 import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
@@ -56,6 +58,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     supabase.from("projects").select("id, name, emoji").neq("status", "archived").order("name"),
     supabase.from("notes").select("id, title").order("updated_at", { ascending: false }).limit(60),
   ]);
+  // Notas que citam o projeto, para "Reanalisar notas" (além das já ligadas)
+  const { data: cited } = await supabase.rpc("search_notes", { q: project.name, max_results: 6 });
 
   const tasks = normalizeTasks(taskRows);
   const suggested = tasks.filter((t) => t.status === "suggested");
@@ -162,12 +166,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               </label>
               <label className="flex flex-col gap-1 text-xs text-muted">
                 Responsável
-              <select name="owner_id" defaultValue={owner?.id ?? ""} className={input}>
-                <option value="">Sem responsável</option>
-                {(people ?? []).map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              <PersonSelect people={people ?? []} defaultValue={owner?.id ?? ""} className={input} />
               </label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Início <input type="date" name="start_date" defaultValue={project.start_date ?? ""} className={input} /></label>
               <label className="flex items-center justify-between gap-2 text-sm text-muted">Prazo <input type="date" name="due_date" defaultValue={project.due_date ?? ""} className={input} /></label>
@@ -313,6 +312,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
               </select>
               <button className="rounded-md bg-surface px-3 text-sm text-muted hover:text-ink">Ligar</button>
             </form>
+            <div className="mt-3">
+              <ReanalyzeNotes what="este projeto" noteIds={[...new Set([...notes.map((n) => n.id), ...((cited ?? []) as { id: string }[]).map((n) => n.id)])].slice(0, 10)} />
+            </div>
           </section>
 
 

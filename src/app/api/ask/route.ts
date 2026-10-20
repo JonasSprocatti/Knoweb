@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/supabase/server";
-import { anthropic, clip, CLAUDE_MODEL } from "@/lib/server/claude";
+import { anthropic, clip, CLAUDE_MODEL, excerpts, keywords } from "@/lib/server/claude";
 import { aiProvider, geminiStream } from "@/lib/server/gemini";
 import { badRequest, unauthorized } from "@/lib/server/http";
 
@@ -52,13 +52,19 @@ export async function POST(request: Request) {
     .select("id, title, summary, content, transcript, kind, created_at")
     .in("id", [...ids].slice(0, 16));
 
+  // As 3 mais relevantes vão quase inteiras; as outras, só os trechos em volta das palavras
+  // da pergunta (o resumo já dá o contexto). Antes: até 12 mil caracteres por nota, em todas.
+  const order = [...ids];
+  const words = keywords(question);
   const context = (notes ?? [])
-    .map((n) => {
-      const body = [n.content, n.transcript && `Transcrição:\n${n.transcript}`].filter(Boolean).join("\n\n");
+    .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
+    .map((n, i) => {
+      const full = [n.content, n.transcript && `Transcrição:\n${n.transcript}`].filter(Boolean).join("\n\n");
+      const body = i < 3 ? clip(full, 8_000) : excerpts(full, words, 2_500);
       return `<nota titulo="${n.title}" data="${new Date(n.created_at).toLocaleDateString("pt-BR")}" tipo="${
         n.kind === "recording" ? "gravação" : "escrita"
       }">
-${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${clip(body, 12_000)}
+${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
 </nota>`;
     })
     .join("\n\n");

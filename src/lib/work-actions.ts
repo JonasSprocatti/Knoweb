@@ -64,7 +64,7 @@ export async function saveProject(form: FormData) {
     status: str(form, "status") ?? "active",
     start_date: str(form, "start_date"),
     due_date: str(form, "due_date"),
-    owner_id: str(form, "owner_id"),
+    owner_id: str(form, "new_owner_id") ? await personByName(supabase, str(form, "new_owner_id")!) : str(form, "owner_id"),
   };
   const saved = id
     ? must(await supabase.from("projects").update(row).eq("id", id).select("slug").single())

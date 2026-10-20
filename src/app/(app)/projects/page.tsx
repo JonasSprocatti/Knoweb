@@ -1,5 +1,6 @@
 import Link from "@/components/Link";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { PersonSelect } from "@/components/PersonSelect";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteProject, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { one, PROJECT_STATUS, Progress, projectColor, formatDay, Timeline, today } from "@/components/Work";
@@ -71,12 +72,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
             <label className="text-sm text-muted">Início <input type="date" name="start_date" className={input} /></label>
             <label className="text-sm text-muted">Prazo <input type="date" name="due_date" className={input} /></label>
-            <select name="owner_id" aria-label="Responsável" className={input} defaultValue={(people ?? []).find((p) => p.is_me)?.id ?? ""}>
-              <option value="">Sem responsável</option>
-              {(people ?? []).map((p) => (
-                <option key={p.id} value={p.id}>{p.is_me ? `Eu (${p.name})` : p.name}</option>
-              ))}
-            </select>
+            <PersonSelect people={people ?? []} defaultValue={(people ?? []).find((p) => p.is_me)?.id ?? ""} className={input} />
             <select name="template_id" aria-label="Modelo" className={input} defaultValue={modelo}>
               <option value="">Sem modelo</option>
               {(templates ?? []).map((t) => (

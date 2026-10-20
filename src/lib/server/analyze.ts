@@ -239,7 +239,9 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
     }));
     const homeProject = homeProjects.length === 1 ? homeProjects[0] : null;
 
-    const userPrompt = `${homeProject?.name ? `<projeto_da_nota>${homeProject.name}</projeto_da_nota>\n\n` : ""}<temas_existentes>
+    // Cadastros (temas, projetos, pessoas, empresas, sistemas) mudam pouco entre uma análise e outra:
+    // vão num bloco próprio com cache, e reanalisar várias notas seguidas paga ~10% deles
+    const catalog = `<temas_existentes>
 ${topicList || "(nenhum ainda)"}
 </temas_existentes>
 
@@ -257,9 +259,8 @@ ${(entities ?? []).filter((e) => e.kind === "company").map((e) => `- ${e.name}`)
 
 <sistemas_existentes>
 ${(entities ?? []).filter((e) => e.kind === "system").map((e) => `- ${e.name}`).join("\n") || "(nenhum ainda)"}
-</sistemas_existentes>
-
-<outras_notas>
+</sistemas_existentes>`;
+    const notePrompt = `${homeProject?.name ? `<projeto_da_nota>${homeProject.name}</projeto_da_nota>\n\n` : ""}<outras_notas>
 ${noteList || "(nenhuma ainda)"}
 </outras_notas>
 
@@ -273,7 +274,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
     if ((await aiProvider()) === "gemini") {
       result = await gemini<AnalysisResult>(
         SYSTEM,
-        [{ role: "user", parts: [{ text: userPrompt.replace("chame a ferramenta salvar_analise", "devolva a análise") }] }],
+        [{ role: "user", parts: [{ text: `${catalog}\n\n${notePrompt.replace("chame a ferramenta salvar_analise", "devolva a análise")}` }] }],
         ANALYSIS_TOOL.input_schema,
       );
     } else {
@@ -283,7 +284,15 @@ Analise a nota e chame a ferramenta salvar_analise.`;
         system: SYSTEM,
         tools: [ANALYSIS_TOOL],
         tool_choice: { type: "tool", name: ANALYSIS_TOOL.name },
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: catalog, cache_control: { type: "ephemeral" } },
+              { type: "text", text: notePrompt },
+            ],
+          },
+        ],
       });
       const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
       if (!toolUse) throw new Error("O Claude não devolveu a análise.");
