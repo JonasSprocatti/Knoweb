@@ -450,19 +450,8 @@ export function NoteView({
           )}
         </section>
 
-        {(note.kind === "recording" || segments.length > 0) && (
-          <Transcript
-            segments={segments}
-            transcript={note.transcript ?? ""}
-            processing={processing}
-            onRetry={retrySegment}
-          />
-        )}
-      </article>
-
-      {/* ===================== Painel do Claude ===================== */}
-      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-6">
-        <section className="rounded-lg border border-line bg-panel p-5">
+        {/* Análise logo abaixo do texto: é a visão geral da nota, não um detalhe de canto */}
+        <section className="rounded-lg border border-line bg-panel p-5 md:p-6" aria-label="Análise do Claude">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="flex items-center gap-1.5 text-base font-semibold">
               <Icon name="sparkle" className="h-4 w-4 text-accent" />
@@ -481,27 +470,29 @@ export function NoteView({
           {processing && <p className="text-sm text-muted">A análise roda automaticamente quando a transcrição terminar.</p>}
 
           {hasAnalysis ? (
-            <div className="flex flex-col gap-4 text-sm">
-              <p className="leading-relaxed text-ink">{note.summary}</p>
-              <InsightList label="Pontos-chave" items={insights.key_points} />
-              {insights.action_items && insights.action_items.length > 0 && (
-                <div>
-                  <h3 className="mb-1.5 font-semibold text-ink">Próximos passos</h3>
-                  <ul className="flex flex-col gap-1.5">
-                    {insights.action_items.map((a, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-sm border border-accent" />
-                        <span>
-                          {a.text}
-                          {(a.owner || a.due) && <span className="text-faint"> — {[a.owner, a.due].filter(Boolean).join(", ")}</span>}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <InsightList label="Decisões" items={insights.decisions} />
-              <InsightList label="Perguntas em aberto" items={insights.questions} />
+            <div className="flex flex-col gap-5 text-sm">
+              <p className="max-w-[68ch] text-[0.95rem] leading-relaxed text-ink">{note.summary}</p>
+              <div className="grid gap-x-10 gap-y-5 md:grid-cols-2">
+                <InsightList label="Pontos-chave" items={insights.key_points} />
+                {insights.action_items && insights.action_items.length > 0 && (
+                  <div>
+                    <h3 className="mb-1.5 font-semibold text-ink">Próximos passos</h3>
+                    <ul className="flex flex-col gap-1.5">
+                      {insights.action_items.map((a, i) => (
+                        <li key={i} className="flex gap-2">
+                          <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-sm border border-accent" />
+                          <span>
+                            {a.text}
+                            {(a.owner || a.due) && <span className="text-faint"> — {[a.owner, a.due].filter(Boolean).join(", ")}</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <InsightList label="Decisões" items={insights.decisions} />
+                <InsightList label="Perguntas em aberto" items={insights.questions} />
+              </div>
               {insights.people && insights.people.length > 0 && (
                 <p className="text-xs text-muted">
                   <span className="font-semibold text-ink">Pessoas: </span>
@@ -516,6 +507,18 @@ export function NoteView({
           )}
         </section>
 
+        {(note.kind === "recording" || segments.length > 0) && (
+          <Transcript
+            segments={segments}
+            transcript={note.transcript ?? ""}
+            processing={processing}
+            onRetry={retrySegment}
+          />
+        )}
+      </article>
+
+      {/* ===================== Painel lateral: temas, trabalho e ligações ===================== */}
+      <aside className="flex flex-col gap-6 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:pb-6">
         <section>
           <h2 className="mb-2 text-base font-semibold">Temas</h2>
           <div className="flex flex-wrap gap-2">
