@@ -13,7 +13,11 @@ const KINDS: Record<string, string> = {
   versions: "Versões de documentos",
   embed: "Busca por significado",
 };
-const usd = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "USD", minimumFractionDigits: v < 1 ? 3 : 2 });
+// Valores pequenos com mais casas: indexar todas as notas custa uns US$ 0,0002
+const usd = (v: number) => {
+  const digits = v === 0 || v >= 1 ? 2 : v >= 0.01 ? 3 : 4;
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "USD", minimumFractionDigits: digits, maximumFractionDigits: digits });
+};
 const tokens = (v: number) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)} mi` : v >= 1_000 ? `${Math.round(v / 1_000)} mil` : String(v));
 
 export default async function SettingsPage() {
