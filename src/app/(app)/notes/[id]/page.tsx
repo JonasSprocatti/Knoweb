@@ -25,8 +25,11 @@ export default async function NotePage({
   const { edit, versao } = await searchParams;
   const supabase = await supabaseServer();
 
-  const { data: note } = await supabase.from("notes").select("*").eq("id", id).maybeSingle();
-  if (!note) notFound();
+  const { data: row } = await supabase.from("notes").select("*").eq("id", id).maybeSingle();
+  if (!row) notFound();
+  // O vetor da busca (~19 KB) e o índice de palavras não vão para o navegador
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { embedding, search, ...note } = row;
 
   const [{ data: segments }, { data: files }, { data: topics }, { data: outgoing }, { data: incoming }, { count: sugTasks }, { count: sugProjects }, { data: versions }] = await Promise.all([
     supabase.from("audio_segments").select("*").eq("note_id", id).order("seq"),

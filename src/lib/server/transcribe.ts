@@ -1,18 +1,14 @@
-import OpenAI, { toFile } from "openai";
+import { toFile } from "openai";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { analyzeNote } from "@/lib/server/analyze";
-import { aiProvider, gemini } from "@/lib/server/gemini";
+import { aiProvider, gemini, GEMINI_MODEL } from "@/lib/server/gemini";
+import { openai } from "@/lib/server/embeddings";
+import { trackGemini, trackUsage } from "@/lib/server/usage";
 import { formatTimestamp } from "@/lib/text";
 
 const MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "whisper-1";
 const LANGUAGE = process.env.TRANSCRIBE_LANGUAGE || "pt";
 
-let client: OpenAI | null = null;
-function openai() {
-  if (!process.env.OPENAI_API_KEY) throw new Error("OPENAI_API_KEY não configurada.");
-  if (!client) client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  return client;
-}
 
 const EXT_BY_MIME: Record<string, string> = {
   "audio/webm": "webm",
@@ -77,6 +73,7 @@ export async function transcribeSegment(supabase: SupabaseClient, segmentId: str
         `Transcreva o áudio literalmente, no idioma "${LANGUAGE}". Não resuma nem traduza. Divida em trechos de uma ou poucas frases, com início e fim em segundos desde o começo do áudio.`,
         [{ role: "user", parts: [{ inline_data: { mime_type: seg.mime_type.split(";")[0], data: audio } }] }],
         GEMINI_SCHEMA,
+        (u) => trackGemini(supabase, "transcribe", GEMINI_MODEL, u),
       );
       segments = (result.segments ?? []).map((s) => ({ start: Number(s.start) || 0, end: Number(s.end) || 0, text: s.text.trim() }));
       text = segments.map((s) => s.text).join(" ");
@@ -95,9 +92,13 @@ export async function transcribeSegment(supabase: SupabaseClient, segmentId: str
         });
         text = result.text ?? "";
         segments = (result.segments ?? []).map((s) => ({ start: s.start, end: s.end, text: s.text.trim() }));
+        await trackUsage(supabase, { kind: "transcribe", provider: "openai", model: MODEL, audioSeconds: Number(result.duration) || segments.at(-1)?.end || 0 });
       } else {
         const result = await openai().audio.transcriptions.create({ file, model: MODEL, language: LANGUAGE });
         text = result.text ?? "";
+        // ponytail: modelos novos cobram por token de áudio; registra a duração do pedaço como se fosse Whisper
+        const { data: d } = await supabase.from("audio_segments").select("duration_seconds").eq("id", segmentId).single();
+        await trackUsage(supabase, { kind: "transcribe", provider: "openai", model: MODEL, audioSeconds: Number(d?.duration_seconds) || 0 });
       }
     }
 

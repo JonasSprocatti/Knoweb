@@ -1,7 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anthropic, clip, CLAUDE_MODEL } from "@/lib/server/claude";
-import { aiProvider, gemini } from "@/lib/server/gemini";
+import { anthropic, cited, clip, CLAUDE_MODEL, plain } from "@/lib/server/claude";
+import { aiProvider, gemini, GEMINI_MODEL } from "@/lib/server/gemini";
+import { embed, noteText, saveEmbedding, similarNotes } from "@/lib/server/embeddings";
+import { trackClaude, trackGemini } from "@/lib/server/usage";
 import { slugify } from "@/lib/text";
 import type { Insights, PendingCreations } from "@/lib/types";
 
@@ -159,10 +161,16 @@ Regras:
 
 const DEFAULT_TITLE_RE = /^(Sem título|Gravação \d)/i;
 
+// Até este tamanho as listas vão inteiras, com todos os detalhes (como sempre foi).
+// Acima, os nomes continuam indo todos, mas os detalhes pesados (resumo de cada nota,
+// histórico de cada pessoa, objetivo de cada projeto) só vão para os parecidos com a
+// nota (busca por significado) e para os citados no texto.
+const FULL_LIST = 40;
+
 export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
   const { data: note, error } = await supabase
     .from("notes")
-    .select("id, title, content, transcript, kind, created_at")
+    .select("id, title, summary, content, transcript, kind, created_at")
     .eq("id", noteId)
     .single();
   if (error || !note) throw new Error("Nota não encontrada.");
@@ -179,7 +187,8 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
   await supabase.from("notes").update({ status: "analyzing" }).eq("id", noteId);
 
   try {
-    const [{ data: topics }, { data: others }, { data: projects }, { data: people }, { data: history }, { data: home }, { data: entities }] = await Promise.all([
+    const [vectors, { data: topics }, { data: others }, { data: projects }, { data: people }, { data: history }, { data: home }, { data: entities }] = await Promise.all([
+      embed(supabase, [noteText(note)]),
       supabase.from("topics").select("name, description").order("name").limit(400),
       supabase
         .from("notes")
@@ -199,13 +208,38 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
       supabase.from("entities").select("id, kind, name, slug").order("name").limit(600),
     ]);
 
-    const topicList = (topics ?? []).map((t) => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n");
-    const noteList = (others ?? [])
-      .map((n) => `- id=${n.id} | ${n.title}${n.summary ? ` — ${clip(n.summary, 220)}` : ""}`)
+    // ---- Busca por significado: notas parecidas com esta (vazio se ainda não houver vetores)
+    const vector = vectors?.[0] ?? null;
+    if (vector) await saveEmbedding(supabase, noteId, vector);
+    const similar = await similarNotes(supabase, vector, 30, noteId);
+    const similarIds = new Set(similar.map((n) => n.id));
+    const text = plain(body);
+
+    // Notas: as parecidas que não estão entre as 150 recentes entram também; com a base grande,
+    // as recentes que não são parecidas nem citadas vão só com o título
+    const candidates = [...(others ?? []), ...similar.filter((n) => !(others ?? []).some((o) => o.id === n.id))];
+    const trimNotes = similar.length > 0 && candidates.length > FULL_LIST;
+    const noteList = candidates
+      .map((n) => `- id=${n.id} | ${n.title}${n.summary && (!trimNotes || similarIds.has(n.id) || cited(text, n.title)) ? ` — ${clip(n.summary, 220)}` : ""}`)
       .join("\n");
 
+    // Pessoas e projetos ligados às notas parecidas recebem os detalhes
+    const trimPeople = similar.length > 0 && (people ?? []).length > FULL_LIST;
+    const trimProjects = similar.length > 0 && (projects ?? []).length > FULL_LIST;
+    const near = [...similarIds].slice(0, 10);
+    const [{ data: nearPeople }, { data: nearProjects }] = await Promise.all([
+      trimPeople ? supabase.from("note_people").select("person_id").in("note_id", near) : { data: [] },
+      trimProjects ? supabase.from("project_notes").select("project_id").in("note_id", near) : { data: [] },
+    ]);
+    const nearPerson = new Set((nearPeople ?? []).map((r) => r.person_id as string));
+    const nearProject = new Set((nearProjects ?? []).map((r) => r.project_id as string));
+
+    const topicList = (topics ?? []).map((t) => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n");
     const projectList = (projects ?? [])
-      .map((p) => `- ${p.name} [${p.status}]${p.description ? `: ${clip(p.description, 160)}` : ""}`)
+      .map((p) => {
+        const detail = !trimProjects || nearProject.has(p.id) || cited(text, p.name);
+        return `- ${p.name} [${p.status}]${detail && p.description ? `: ${clip(p.description, 160)}` : ""}`;
+      })
       .join("\n");
     // Histórico de cada pessoa: as tarefas mais recentes e os projetos em que trabalhou
     const past = new Map<string, { tasks: string[]; projects: Set<string> }>();
@@ -221,11 +255,12 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
     const peopleList = (people ?? [])
       .map((p) => {
         const h = past.get(p.id);
+        const detail = !trimPeople || p.is_me || nearPerson.has(p.id) || cited(text, p.name, true);
         return [
           `- ${p.name}${p.is_me ? " [VOCÊ]" : ""}${p.role ? ` (${p.role})` : ""}`,
-          p.about && `  faz: ${clip(p.about, 300)}`,
-          h?.tasks.length && `  tarefas recentes: ${h.tasks.join("; ")}`,
-          h?.projects.size && `  projetos: ${[...h.projects].slice(0, 6).join(", ")}`,
+          detail && p.about && `  faz: ${clip(p.about, 300)}`,
+          detail && h?.tasks.length && `  tarefas recentes: ${h.tasks.join("; ")}`,
+          detail && h?.projects.size && `  projetos: ${[...h.projects].slice(0, 6).join(", ")}`,
         ]
           .filter(Boolean)
           .join("\n");
@@ -239,19 +274,12 @@ export async function analyzeNote(supabase: SupabaseClient, noteId: string) {
     }));
     const homeProject = homeProjects.length === 1 ? homeProjects[0] : null;
 
-    // Cadastros (temas, projetos, pessoas, empresas, sistemas) mudam pouco entre uma análise e outra:
-    // vão num bloco próprio com cache, e reanalisar várias notas seguidas paga ~10% deles
+    // Cadastros mudam pouco entre uma análise e outra: vão em blocos com cache, e reanalisar
+    // várias notas seguidas paga ~10% deles. Temas, empresas e sistemas são sempre iguais;
+    // pessoas e projetos também, enquanto vão inteiros.
     const catalog = `<temas_existentes>
 ${topicList || "(nenhum ainda)"}
 </temas_existentes>
-
-<projetos_existentes>
-${projectList || "(nenhum ainda)"}
-</projetos_existentes>
-
-<pessoas_existentes>
-${peopleList || "(nenhuma ainda)"}
-</pessoas_existentes>
 
 <empresas_existentes>
 ${(entities ?? []).filter((e) => e.kind === "company").map((e) => `- ${e.name}`).join("\n") || "(nenhuma ainda)"}
@@ -260,6 +288,13 @@ ${(entities ?? []).filter((e) => e.kind === "company").map((e) => `- ${e.name}`)
 <sistemas_existentes>
 ${(entities ?? []).filter((e) => e.kind === "system").map((e) => `- ${e.name}`).join("\n") || "(nenhum ainda)"}
 </sistemas_existentes>`;
+    const team = `<projetos_existentes>
+${projectList || "(nenhum ainda)"}
+</projetos_existentes>
+
+<pessoas_existentes>
+${peopleList || "(nenhuma ainda)"}
+</pessoas_existentes>`;
     const notePrompt = `${homeProject?.name ? `<projeto_da_nota>${homeProject.name}</projeto_da_nota>\n\n` : ""}<outras_notas>
 ${noteList || "(nenhuma ainda)"}
 </outras_notas>
@@ -274,8 +309,9 @@ Analise a nota e chame a ferramenta salvar_analise.`;
     if ((await aiProvider()) === "gemini") {
       result = await gemini<AnalysisResult>(
         SYSTEM,
-        [{ role: "user", parts: [{ text: `${catalog}\n\n${notePrompt.replace("chame a ferramenta salvar_analise", "devolva a análise")}` }] }],
+        [{ role: "user", parts: [{ text: `${catalog}\n\n${team}\n\n${notePrompt.replace("chame a ferramenta salvar_analise", "devolva a análise")}` }] }],
         ANALYSIS_TOOL.input_schema,
+        (u) => trackGemini(supabase, "analyze", GEMINI_MODEL, u),
       );
     } else {
       const response = await anthropic().messages.create({
@@ -283,17 +319,19 @@ Analise a nota e chame a ferramenta salvar_analise.`;
         max_tokens: 4096,
         system: SYSTEM,
         tools: [ANALYSIS_TOOL],
-        tool_choice: { type: "tool", name: ANALYSIS_TOOL.name },
+        tool_choice: { type: "auto" }, // os modelos novos (Sonnet 5.5) recusam tool_choice forçado; o prompt pede a ferramenta
         messages: [
           {
             role: "user",
             content: [
               { type: "text", text: catalog, cache_control: { type: "ephemeral" } },
+              { type: "text", text: team, ...(trimPeople || trimProjects ? {} : { cache_control: { type: "ephemeral" as const } }) },
               { type: "text", text: notePrompt },
             ],
           },
         ],
       });
+      await trackClaude(supabase, "analyze", CLAUDE_MODEL, response.usage);
       const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
       if (!toolUse) throw new Error("O Claude não devolveu a análise.");
       result = toolUse.input as AnalysisResult;
@@ -339,7 +377,7 @@ Analise a nota e chame a ferramenta salvar_analise.`;
     }
 
     // ---- Notas relacionadas -----------------------------------------
-    const validIds = new Set((others ?? []).map((n) => n.id as string));
+    const validIds = new Set(candidates.map((n) => n.id as string));
     await supabase.from("note_links").delete().eq("source_id", noteId).eq("kind", "ai");
     const linkRows = (result.related_notes ?? [])
       .filter((r) => validIds.has(r.id))

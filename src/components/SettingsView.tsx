@@ -12,7 +12,8 @@ const PALETTES: { id: Prefs["palette"]; name: string; colors: [string, string] }
 ];
 
 /** Ajustes visuais deste aparelho: tema, paleta, tamanho do texto e animações. Mudam na hora. */
-export function SettingsView() {
+/** `children`: seções que vêm do servidor (uso das IAs). */
+export function SettingsView({ children }: { children?: React.ReactNode }) {
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [saved, setSaved] = useState(false);
 
@@ -107,6 +108,8 @@ export function SettingsView() {
       </Section>
 
       <Notifications />
+
+      {children}
 
       <section className="rounded-lg border border-line bg-panel p-4">
         <p className="mb-3 text-sm text-muted">Prévia</p>

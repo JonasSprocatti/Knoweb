@@ -1,6 +1,8 @@
 import { requireUser } from "@/lib/supabase/server";
 import { anthropic, clip, CLAUDE_MODEL, excerpts, keywords } from "@/lib/server/claude";
-import { aiProvider, geminiStream } from "@/lib/server/gemini";
+import { aiProvider, geminiStream, GEMINI_MODEL } from "@/lib/server/gemini";
+import { embed, similarNotes } from "@/lib/server/embeddings";
+import { trackClaude, trackGemini } from "@/lib/server/usage";
 import { badRequest, unauthorized } from "@/lib/server/http";
 
 export const maxDuration = 300;
@@ -26,10 +28,11 @@ export async function POST(request: Request) {
   };
   if (!question?.trim()) return badRequest("Faça uma pergunta.");
 
-  // 1) Busca por palavras (OU) + notas ligadas a temas citados na pergunta
-  const [{ data: hits }, { data: topics }] = await Promise.all([
+  // 1) Busca por palavras (OU) + notas ligadas a temas citados na pergunta + busca por significado
+  const [{ data: hits }, { data: topics }, vectors] = await Promise.all([
     supabase.rpc("search_notes", { q: question, max_results: 12, any_word: true }),
     supabase.from("topics").select("id, name"),
+    embed(supabase, [question]),
   ]);
 
   const lowerQ = question.toLowerCase();
@@ -42,19 +45,25 @@ export async function POST(request: Request) {
     const { data: tn } = await supabase.from("note_topics").select("note_id").in("topic_id", topicIds).limit(20);
     for (const r of tn ?? []) ids.add(r.note_id as string);
   }
-  if (ids.size === 0) {
+  // A busca por significado só acrescenta: as notas achadas por palavras/temas vêm primeiro (as mesmas
+  // 16 de antes) e até 6 parecidas entram depois, mesmo sem as palavras exatas
+  const similar = (await similarNotes(supabase, vectors?.[0] ?? null, 12)).filter((n) => n.similarity >= 0.3).map((n) => n.id);
+  const found = ids.size > 0;
+  if (!found) {
+    // Nada por palavras: as parecidas vêm antes das 8 recentes de reserva
     const { data: recent } = await supabase.from("notes").select("id").order("updated_at", { ascending: false }).limit(8);
-    for (const r of recent ?? []) ids.add(r.id as string);
+    for (const id of [...similar.slice(0, 6), ...(recent ?? []).map((r) => r.id as string)]) ids.add(id);
   }
-
+  const picked = [...ids].slice(0, 16);
+  if (found) for (const id of similar) if (picked.length < 22 && !picked.includes(id)) picked.push(id);
   const { data: notes } = await supabase
     .from("notes")
     .select("id, title, summary, content, transcript, kind, created_at")
-    .in("id", [...ids].slice(0, 16));
+    .in("id", picked);
 
   // As 3 mais relevantes vão quase inteiras; as outras, só os trechos em volta das palavras
   // da pergunta (o resumo já dá o contexto). Antes: até 12 mil caracteres por nota, em todas.
-  const order = [...ids];
+  const order = picked;
   const words = keywords(question);
   const context = (notes ?? [])
     .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
@@ -111,7 +120,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
             role: m.role === "assistant" ? ("model" as const) : ("user" as const),
             parts: [{ text: m.content }],
           }));
-          for await (const text of geminiStream(SYSTEM, turns)) controller.enqueue(encoder.encode(text));
+          for await (const text of geminiStream(SYSTEM, turns, (u) => trackGemini(supabase, "ask", GEMINI_MODEL, u))) controller.enqueue(encoder.encode(text));
           return;
         }
         const response = anthropic().messages.stream({
@@ -125,6 +134,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
+        await trackClaude(supabase, "ask", CLAUDE_MODEL, (await response.finalMessage()).usage);
       } catch (err) {
         controller.enqueue(encoder.encode(`\n\n**Erro:** ${err instanceof Error ? err.message : String(err)}`));
       } finally {

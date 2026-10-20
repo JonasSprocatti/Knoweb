@@ -19,8 +19,19 @@ export function clip(text: string, max: number): string {
   return `${text.slice(0, head)}\n\n[... trecho omitido ...]\n\n${text.slice(-tail)}`;
 }
 
-const STOP = new Set("que com dos das nos nas por nao sim ela ele seu sua foi tem sao era mas pra ser vai ter ate meu minha qual voce como para qual quais quem onde quando porque sobre isso esse essa este esta estes essas esses aquele aquela entre depois antes ainda também mais menos muito pelo pela pelos pelas numa num uma umas uns foram será seria tinha temos tenho fazer feito quero queria preciso pode podem algum alguma alguns algumas tudo todos todas nada cada mesmo mesma".split(" "));
-const plain = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+const STOP = new Set("que com dos das nos nas por nao sim ela ele seu sua foi tem sao era mas pra ser vai ter ate meu minha qual voce como para qual quais quem onde quando porque sobre isso esse essa este esta estes essas esses aquele aquela entre depois antes ainda tambem mais menos muito pelo pela pelos pelas numa num uma umas uns foram sera seria tinha temos tenho fazer feito quero queria preciso pode podem algum alguma alguns algumas tudo todos todas nada cada mesmo mesma".split(" "));
+export const plain = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+/**
+ * O nome aparece em `text` (já passado por plain)? Palavra inteira: "Ana" não casa
+ * dentro de "S/4HANA". Com `firstName`, vale também o primeiro nome (4+ letras).
+ */
+export function cited(text: string, name: string, firstName = false) {
+  const has = (w: string) => w.length >= 3 && new RegExp(`(^|[^\\p{L}\\p{N}])${w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^\\p{L}\\p{N}])`, "u").test(text);
+  const n = plain(name.trim());
+  const first = n.split(/\s+/)[0];
+  return has(n) || (firstName && first.length >= 4 && has(first));
+}
 
 /** Palavras que valem buscar na pergunta (sem acento, 3+ letras para pegar siglas como SAP, sem as muito comuns). */
 export function keywords(question: string) {

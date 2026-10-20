@@ -653,3 +653,52 @@ create index if not exists push_subscriptions_user_idx on public.push_subscripti
 alter table public.push_subscriptions enable row level security;
 drop policy if exists "own_rows" on public.push_subscriptions;
 create policy "own_rows" on public.push_subscriptions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Uso das IAs: cada chamada (análise, Perguntar, transcrição, leitura de
+-- arquivos, vetores) com os tokens e o custo estimado. Configurações mostra
+-- o total do mês. Pode rodar de novo sem problema.
+-- ---------------------------------------------------------------------
+create table if not exists public.ai_usage (
+  id                  bigint generated always as identity primary key,
+  user_id             uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at          timestamptz not null default now(),
+  kind                text not null,          -- analyze | ask | transcribe | ingest | versions | embed
+  provider            text not null,          -- claude | gemini | openai
+  model               text not null,
+  input_tokens        integer not null default 0,
+  output_tokens       integer not null default 0,
+  cache_read_tokens   integer not null default 0,
+  cache_write_tokens  integer not null default 0,
+  audio_seconds       numeric not null default 0,
+  cost_usd            numeric(12, 6) not null default 0
+);
+create index if not exists ai_usage_user_month_idx on public.ai_usage (user_id, created_at desc);
+alter table public.ai_usage enable row level security;
+drop policy if exists "own_rows" on public.ai_usage;
+create policy "own_rows" on public.ai_usage for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Busca por significado (pgvector): cada nota guarda um vetor de 1536
+-- números (OpenAI text-embedding-3-small). O Perguntar soma as notas
+-- parecidas às achadas por palavras, e a análise manda ao Claude só os
+-- detalhes do que é parecido. Sem isto rodado, o app segue só com palavras.
+-- ---------------------------------------------------------------------
+create extension if not exists vector with schema extensions;
+alter table public.notes add column if not exists embedding extensions.vector(1536);
+create index if not exists notes_embedding_idx on public.notes using hnsw (embedding extensions.vector_cosine_ops);
+
+create or replace function public.match_notes(query_embedding extensions.vector(1536), match_count int default 20, exclude_id uuid default null)
+returns table (id uuid, title text, summary text, similarity float)
+language sql stable security invoker
+set search_path = public, extensions
+as $$
+  select n.id, n.title, n.summary, 1 - (n.embedding <=> query_embedding) as similarity
+  from public.notes n
+  where n.user_id = auth.uid()
+    and n.embedding is not null
+    and n.merged_into is null
+    and (exclude_id is null or n.id <> exclude_id)
+  order by n.embedding <=> query_embedding
+  limit match_count;
+$$;
