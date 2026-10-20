@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteProject, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { one, PROJECT_STATUS, Progress, projectColor, formatDay, Timeline, today } from "@/components/Work";
@@ -64,7 +65,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
           <Link href="/templates" className="ml-2 text-sm font-normal text-muted hover:text-ink hover:underline">Modelos</Link>
         </summary>
         <form action={saveProject} className="mt-3 grid gap-2 sm:grid-cols-[4rem_1fr]">
-          <input name="emoji" placeholder="🚀" aria-label="Ícone (emoji)" title="Um emoji que aparece ao lado do nome e na teia" maxLength={8} className={`${input} text-center`} />
+          <EmojiPicker placeholder="🚀" label="Ícone" />
           <input name="name" required placeholder="Nome do projeto" aria-label="Nome" className={input} />
           <textarea name="description" placeholder="Objetivo" aria-label="Objetivo" rows={2} className={`${input} sm:col-span-2`} />
           <div className="flex flex-wrap items-center gap-2 sm:col-span-2">

@@ -1,4 +1,5 @@
 import Link from "@/components/Link";
+import { EmojiPicker } from "@/components/EmojiPicker";
 import { SaveButton } from "@/components/SaveButton";
 import { supabaseServer } from "@/lib/supabase/server";
 import { deleteTemplate, saveTemplate } from "@/lib/work-actions";
@@ -20,7 +21,7 @@ function TemplateForm({ t }: { t?: Template }) {
     <form action={saveTemplate} className="flex flex-col gap-2">
       {t && <input type="hidden" name="id" value={t.id} />}
       <div className="flex gap-2">
-        <input name="emoji" defaultValue={t?.emoji ?? ""} placeholder="📋" aria-label="Emoji" className={`${input} w-14`} />
+        <EmojiPicker defaultValue={t?.emoji} placeholder="📋" />
         <input name="name" required defaultValue={t?.name} placeholder="Nome do modelo (ex.: Lançamento de produto)" aria-label="Nome" className={`${input} flex-1`} />
       </div>
       <input name="description" defaultValue={t?.description ?? ""} placeholder="Objetivo padrão do projeto" aria-label="Descrição" className={input} />
