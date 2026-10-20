@@ -2,11 +2,13 @@ import Link from "@/components/Link";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { PersonSelect } from "@/components/PersonSelect";
 import { ReanalyzeNotes } from "@/components/ReanalyzeNotes";
+import { ProjectDocWriter } from "@/components/ProjectDocWriter";
+import { Icon } from "@/components/Icon";
 import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { acceptSuggested, deleteProject, linkNote, saveProject, setProjectStatus, templateFromProject, unlinkNote } from "@/lib/work-actions";
+import { acceptSuggested, createProjectDoc, deleteProject, linkNote, saveProject, setProjectStatus, templateFromProject, unlinkNote } from "@/lib/work-actions";
 import {
   Calendar,
   cycleDays,
@@ -59,6 +61,8 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     supabase.from("notes").select("id, title").order("updated_at", { ascending: false }).limit(60),
   ]);
 
+  // Documento do projeto na base de conhecimento (sem a tabela ainda, fica null)
+  const { data: doc } = await supabase.from("knowledge").select("id, status").eq("kind", "project").eq("project_id", project.id).maybeSingle();
   const tasks = normalizeTasks(taskRows);
   const suggested = tasks.filter((t) => t.status === "suggested");
   const real = tasks.filter((t) => t.status !== "suggested" && t.status !== "canceled");
@@ -125,6 +129,23 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           )}
         </div>
         {project.description && <p className="max-w-3xl text-muted">{project.description}</p>}
+        {doc ? (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-panel p-3 text-sm">
+            <Icon name="book" className="h-5 w-5 text-accent" />
+            <Link href={`/knowledge/${doc.id}`} className="font-medium text-ink hover:underline">
+              Documento do projeto na Base de conhecimento
+            </Link>
+            <ProjectDocWriter docId={doc.id} status={doc.status} />
+          </div>
+        ) : (
+          project.status === "done" && (
+            <form action={createProjectDoc.bind(null, project.id)}>
+              <button className="flex items-center gap-2 rounded-md border border-line px-3 py-1.5 text-sm text-muted hover:border-accent hover:text-ink">
+                <Icon name="book" className="h-4 w-4 text-accent" /> Gerar o documento completo do projeto
+              </button>
+            </form>
+          )
+        )}
         {project.status === "suggested" && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-accent/60 bg-panel p-3 text-sm">
             <span className="flex-1 text-muted">O Claude sugeriu este projeto{project.reason ? `: ${project.reason}` : "."}</span>

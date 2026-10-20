@@ -24,6 +24,7 @@ const PATHS: Record<string, string> = {
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
   sprint: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2",
   wave: "M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1",
+  book: "M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zm0 15a2 2 0 0 0 2 2h12v-4M9 7h6",
 };
 
 export function Icon({ name, className = "h-5 w-5" }: { name: keyof typeof PATHS | string; className?: string }) {

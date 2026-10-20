@@ -12,6 +12,7 @@ const KINDS: Record<string, string> = {
   ingest: "Leitura de arquivos",
   versions: "Versões de documentos",
   embed: "Busca por significado",
+  knowledge: "Documentos de projeto",
 };
 // Valores pequenos com mais casas: indexar todas as notas custa uns US$ 0,0002
 const usd = (v: number) => {

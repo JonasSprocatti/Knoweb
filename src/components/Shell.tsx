@@ -19,6 +19,7 @@ const NAV = [
   { href: "/systems", label: "Sistemas", icon: "server" },
   { href: "/graph", label: "Teia", icon: "graph" },
   { href: "/ask", label: "Perguntar", icon: "ask" },
+  { href: "/knowledge", label: "Base", icon: "book" },
 ];
 
 // No celular: quatro atalhos + "Mais" (gaveta com o resto, a conta e o sair)

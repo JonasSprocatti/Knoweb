@@ -702,3 +702,65 @@ as $$
   order by n.embedding <=> query_embedding
   limit match_count;
 $$;
+
+-- ---------------------------------------------------------------------
+-- Conversas do Perguntar: cada conversa e as mensagens, para reabrir
+-- uma resposta em vez de perguntar de novo. Pode rodar de novo sem problema.
+-- ---------------------------------------------------------------------
+create table if not exists public.ask_sessions (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title         text not null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index if not exists ask_sessions_user_idx on public.ask_sessions (user_id, updated_at desc);
+alter table public.ask_sessions enable row level security;
+drop policy if exists "own_rows" on public.ask_sessions;
+create policy "own_rows" on public.ask_sessions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create table if not exists public.ask_messages (
+  id            bigint generated always as identity primary key,
+  session_id    uuid not null references public.ask_sessions(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  role          text not null check (role in ('user', 'assistant')),
+  content       text not null,
+  sources       jsonb not null default '[]',
+  created_at    timestamptz not null default now(),
+  search        tsvector generated always as (to_tsvector('portuguese', coalesce(content, ''))) stored
+);
+create index if not exists ask_messages_session_idx on public.ask_messages (session_id, id);
+create index if not exists ask_messages_search_idx on public.ask_messages using gin (search);
+alter table public.ask_messages enable row level security;
+drop policy if exists "own_rows" on public.ask_messages;
+create policy "own_rows" on public.ask_messages for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Base de conhecimento: o que já é definitivo (artigo escrito, resposta
+-- salva, nota marcada) e o documento de cada projeto concluído, escrito
+-- pela IA. O Perguntar consulta a base antes das notas.
+-- ---------------------------------------------------------------------
+create table if not exists public.knowledge (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title         text not null,
+  content       text not null default '',
+  kind          text not null default 'manual' check (kind in ('manual', 'answer', 'note', 'project')),
+  -- documento de projeto: queued (esperando) → writing (a IA está escrevendo) → ready | error
+  status        text not null default 'ready' check (status in ('queued', 'writing', 'ready', 'error')),
+  project_id    uuid references public.projects(id) on delete set null,
+  note_id       uuid references public.notes(id) on delete set null,
+  session_id    uuid references public.ask_sessions(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  search        tsvector generated always as (
+                  setweight(to_tsvector('portuguese', coalesce(title, '')), 'A') ||
+                  setweight(to_tsvector('portuguese', coalesce(content, '')), 'B')
+                ) stored
+);
+create unique index if not exists knowledge_project_doc_idx on public.knowledge (project_id) where kind = 'project';
+create index if not exists knowledge_user_idx on public.knowledge (user_id, updated_at desc);
+create index if not exists knowledge_search_idx on public.knowledge using gin (search);
+alter table public.knowledge enable row level security;
+drop policy if exists "own_rows" on public.knowledge;
+create policy "own_rows" on public.knowledge for all using (user_id = auth.uid()) with check (user_id = auth.uid());

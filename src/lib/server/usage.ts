@@ -2,7 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** Para que a IA foi chamada (aparece em Configurações → Uso das IAs). */
-export type UsageKind = "analyze" | "ask" | "transcribe" | "ingest" | "versions" | "embed";
+export type UsageKind = "analyze" | "ask" | "transcribe" | "ingest" | "versions" | "embed" | "knowledge";
 
 type Usage = {
   kind: UsageKind;

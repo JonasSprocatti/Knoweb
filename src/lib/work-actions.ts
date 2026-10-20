@@ -69,6 +69,10 @@ export async function saveProject(form: FormData) {
   const saved = id
     ? must(await supabase.from("projects").update(row).eq("id", id).select("slug").single())
     : must(await supabase.from("projects").insert(row).select("slug").single());
+  if (row.status === "done") {
+    const { data: p } = await supabase.from("projects").select("id").eq("slug", saved.slug).single();
+    if (p) await queueProjectDoc(supabase, p.id);
+  }
   const noteId = str(form, "note_id");
   const templateId = str(form, "template_id");
   if (!id && (noteId || templateId)) {
@@ -113,6 +117,7 @@ async function applyTemplate(supabase: SupabaseClient, templateId: string, proje
 export async function setProjectStatus(id: string, status: string) {
   const supabase = await db();
   must(await supabase.from("projects").update({ status }).eq("id", id));
+  if (status === "done") await queueProjectDoc(supabase, id);
   // Aceitar o projeto aceita também as tarefas que o Claude sugeriu para ele
   if (status === "active") await supabase.from("tasks").update({ status: "todo" }).eq("project_id", id).eq("status", "suggested");
   refresh();
@@ -649,4 +654,90 @@ export async function saveTopic(id: string, form: FormData) {
   const saved = must(await supabase.from("topics").update(row).eq("id", id).select("slug").single());
   refresh();
   redirect(`/topics/${saved.slug}`);
+}
+
+// ---------------------------------------------------------------- Base de conhecimento
+
+/**
+ * Projeto concluído: põe o documento dele na fila da base (a tela do projeto e a da
+ * base pedem para a IA escrever). Só cria se ainda não existe; refazer é pelo botão.
+ * Sem a tabela (SQL ainda não rodado), não faz nada.
+ */
+async function queueProjectDoc(supabase: SupabaseClient, projectId: string) {
+  const { data: doc, error } = await supabase.from("knowledge").select("id").eq("kind", "project").eq("project_id", projectId).maybeSingle();
+  if (error || doc) return;
+  const { data: p } = await supabase.from("projects").select("name, emoji").eq("id", projectId).single();
+  await supabase.from("knowledge").insert({ kind: "project", project_id: projectId, status: "queued", title: `${p?.emoji ? `${p.emoji} ` : ""}${p?.name ?? "Projeto"}` });
+}
+
+/** Escrever de novo o documento de um projeto (volta para a fila). */
+export async function rewriteProjectDoc(id: string) {
+  const supabase = await db();
+  must(await supabase.from("knowledge").update({ status: "queued" }).eq("id", id).eq("kind", "project"));
+  refresh();
+}
+
+/** Gera agora o documento de um projeto (já concluído ou não). */
+export async function createProjectDoc(projectId: string) {
+  const supabase = await db();
+  await queueProjectDoc(supabase, projectId);
+  const { data: doc } = await supabase.from("knowledge").select("id").eq("kind", "project").eq("project_id", projectId).maybeSingle();
+  if (!doc) throw new Error("Rode o SQL da base de conhecimento no Supabase.");
+  refresh();
+  redirect(`/knowledge/${doc.id}`);
+}
+
+export async function saveKnowledge(form: FormData) {
+  const supabase = await db();
+  const id = str(form, "id");
+  const title = str(form, "title");
+  if (!title) throw new Error("Dê um título.");
+  const row = { title, content: (form.get("content") as string | null) ?? "", updated_at: new Date().toISOString() };
+  const saved = id
+    ? must(await supabase.from("knowledge").update(row).eq("id", id).select("id").single())
+    : must(await supabase.from("knowledge").insert({ ...row, kind: "manual" }).select("id").single());
+  refresh();
+  redirect(`/knowledge/${saved.id}`);
+}
+
+export async function deleteKnowledge(id: string, _form?: FormData) {
+  const supabase = await db();
+  must(await supabase.from("knowledge").delete().eq("id", id));
+  refresh();
+  redirect("/knowledge");
+}
+
+/** Resposta do Perguntar que virou definitiva. Devolve o id do artigo. */
+export async function answerToKnowledge(question: string, answer: string, sessionId: string | null) {
+  const supabase = await db();
+  const saved = must(
+    await supabase
+      .from("knowledge")
+      .insert({ kind: "answer", title: question.trim().slice(0, 200), content: answer, session_id: sessionId })
+      .select("id")
+      .single(),
+  );
+  refresh();
+  return saved.id as string;
+}
+
+/** Nota marcada como definitiva: resumo, decisões e o texto viram um artigo. */
+export async function noteToKnowledge(noteId: string) {
+  const supabase = await db();
+  const { data: n } = await supabase.from("notes").select("title, summary, insights, content").eq("id", noteId).single();
+  if (!n) throw new Error("Nota não encontrada.");
+  const ins = (n.insights ?? {}) as Insights;
+  const list = (label: string, items?: string[]) => (items?.length ? `## ${label}\n${items.map((i) => `- ${i}`).join("\n")}` : "");
+  const content = [
+    n.summary,
+    list("Pontos-chave", ins.key_points),
+    list("Decisões", ins.decisions),
+    n.content?.trim() && `## Texto da nota\n${n.content.trim()}`,
+    `Fonte: [[${n.title}]]`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const saved = must(await supabase.from("knowledge").insert({ kind: "note", title: n.title, content, note_id: noteId }).select("id").single());
+  refresh();
+  redirect(`/knowledge/${saved.id}`);
 }
