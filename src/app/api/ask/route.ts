@@ -12,7 +12,8 @@ type Turn = { role: "user" | "assistant"; content: string };
 const SYSTEM = `Você é o assistente da base de conhecimento pessoal do usuário (notas escritas e transcrições de conversas).
 Responda em português do Brasil usando SOMENTE as notas e o quadro de trabalho (projetos, tarefas, pessoas) fornecidos como fonte. Se as notas não respondem, diga isso claramente e sugira o que gravar ou anotar.
 Cite as notas de onde tirou cada informação escrevendo o título exato entre colchetes duplos, como [[Título da nota]].
-Cite tarefas pelo código (ex.: T-12) e projetos pelo nome. Seja direto. Use listas quando ajudarem. Quando citar o que alguém disse numa gravação, inclua a marca de tempo se houver.`;
+Cite tarefas pelo código (ex.: T-12) e projetos pelo nome. Seja direto. Use listas quando ajudarem. Quando citar o que alguém disse numa gravação, inclua a marca de tempo se houver.
+A <base_de_conhecimento>, quando vier, traz o que o usuário já confirmou como definitivo (artigos, respostas salvas e o documento final de projetos concluídos): ela vale mais que as notas. Quando ela responder, use-a primeiro e cite como (Base: Título); se uma nota mais nova contradisser a base, aponte a diferença.`;
 
 /**
  * "Perguntar à teia": busca as notas mais relevantes no Postgres e pede ao
@@ -22,11 +23,35 @@ export async function POST(request: Request) {
   const { supabase, user } = await requireUser();
   if (!user) return unauthorized();
 
-  const { question, history = [] } = (await request.json().catch(() => ({}))) as {
+  const { question, history = [], sessionId } = (await request.json().catch(() => ({}))) as {
     question?: string;
     history?: Turn[];
+    sessionId?: string | null;
   };
   if (!question?.trim()) return badRequest("Faça uma pergunta.");
+
+  // Conversa salva: continua a que veio ou abre uma nova (sem a tabela, segue sem salvar)
+  let session: string | null = null;
+  if (sessionId) {
+    const { data } = await supabase.from("ask_sessions").select("id").eq("id", sessionId).maybeSingle();
+    session = (data?.id as string) ?? null;
+  }
+  if (!session) {
+    const { data } = await supabase.from("ask_sessions").insert({ title: question.trim().slice(0, 140) }).select("id").maybeSingle();
+    session = (data?.id as string) ?? null;
+  }
+  if (session) await supabase.from("ask_messages").insert({ session_id: session, role: "user", content: question.trim() });
+
+  // Base de conhecimento: o que já é definitivo vem antes das notas
+  const words = keywords(question);
+  const { data: kb } = words.length
+    ? await supabase
+        .from("knowledge")
+        .select("id, title, kind, content")
+        .eq("status", "ready")
+        .textSearch("search", words.join(" or "), { type: "websearch", config: "portuguese" })
+        .limit(4)
+    : { data: [] };
 
   // 1) Busca por palavras (OU) + notas ligadas a temas citados na pergunta + busca por significado
   const [{ data: hits }, { data: topics }, vectors] = await Promise.all([
@@ -64,7 +89,6 @@ export async function POST(request: Request) {
   // As 3 mais relevantes vão quase inteiras; as outras, só os trechos em volta das palavras
   // da pergunta (o resumo já dá o contexto). Antes: até 12 mil caracteres por nota, em todas.
   const order = picked;
-  const words = keywords(question);
   const context = (notes ?? [])
     .sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
     .map((n, i) => {
@@ -106,21 +130,30 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
       .map((t) => ({ role: t.role, content: t.content })),
     {
       role: "user" as const,
-      content: `<trabalho hoje="${new Date().toISOString().slice(0, 10)}">\n${work || "(nenhum projeto ou tarefa)"}\n</trabalho>\n\n<notas>\n${context || "(nenhuma nota encontrada)"}\n</notas>\n\nPergunta: ${question}`,
+      content: `${(kb ?? []).length ? `<base_de_conhecimento>\n${(kb ?? []).map((k) => `<artigo titulo="${k.title}"${k.kind === "project" ? ' tipo="projeto concluído"' : ""}>\n${clip(k.content, 12_000)}\n</artigo>`).join("\n\n")}\n</base_de_conhecimento>\n\n` : ""}<trabalho hoje="${new Date().toISOString().slice(0, 10)}">\n${work || "(nenhum projeto ou tarefa)"}\n</trabalho>\n\n<notas>\n${context || "(nenhuma nota encontrada)"}\n</notas>\n\nPergunta: ${question}`,
     },
   ];
 
+  const sources = [
+    ...(kb ?? []).map((k) => ({ id: k.id as string, title: k.title as string, kb: true })),
+    ...(notes ?? []).map((n) => ({ id: n.id, title: n.title })),
+  ];
   const provider = await aiProvider();
   const encoder = new TextEncoder();
+  let answer = "";
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const send = (text: string) => {
+        answer += text;
+        controller.enqueue(encoder.encode(text));
+      };
       try {
         if (provider === "gemini") {
           const turns = messages.map((m) => ({
             role: m.role === "assistant" ? ("model" as const) : ("user" as const),
             parts: [{ text: m.content }],
           }));
-          for await (const text of geminiStream(SYSTEM, turns, (u) => trackGemini(supabase, "ask", GEMINI_MODEL, u))) controller.enqueue(encoder.encode(text));
+          for await (const text of geminiStream(SYSTEM, turns, (u) => trackGemini(supabase, "ask", GEMINI_MODEL, u))) send(text);
           return;
         }
         const response = anthropic().messages.stream({
@@ -131,13 +164,18 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
         });
         for await (const event of response) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            controller.enqueue(encoder.encode(event.delta.text));
+            send(event.delta.text);
           }
         }
         await trackClaude(supabase, "ask", CLAUDE_MODEL, (await response.finalMessage()).usage);
       } catch (err) {
-        controller.enqueue(encoder.encode(`\n\n**Erro:** ${err instanceof Error ? err.message : String(err)}`));
+        send(`\n\n**Erro:** ${err instanceof Error ? err.message : String(err)}`);
       } finally {
+        // A resposta fica salva na conversa (para reabrir sem perguntar de novo)
+        if (session && answer.trim()) {
+          await supabase.from("ask_messages").insert({ session_id: session, role: "assistant", content: answer, sources });
+          await supabase.from("ask_sessions").update({ updated_at: new Date().toISOString() }).eq("id", session);
+        }
         controller.close();
       }
     },
@@ -147,7 +185,8 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
-      "X-Sources": encodeURIComponent(JSON.stringify((notes ?? []).map((n) => ({ id: n.id, title: n.title })))),
+      "X-Sources": encodeURIComponent(JSON.stringify(sources)),
+      ...(session ? { "X-Session": session } : {}),
     },
   });
 }

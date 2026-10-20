@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "@/components/Link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/Markdown";
+import { answerToKnowledge } from "@/lib/work-actions";
 
-type Msg = { role: "user" | "assistant"; content: string; sources?: { id: string; title: string }[] };
+export type Msg = { role: "user" | "assistant"; content: string; sources?: { id: string; title: string; kb?: boolean }[] };
 
 const EXAMPLES = [
   "Quais tarefas ficaram pendentes nas últimas reuniões?",
@@ -14,8 +16,10 @@ const EXAMPLES = [
 ];
 
 /** "Perguntar à teia": chat com o Claude usando as suas notas como fonte. */
-export function AskView({ initialQuestion }: { initialQuestion: string }) {
-  const [messages, setMessages] = useState<Msg[]>([]);
+export function AskView({ initialQuestion, sessionId = null, initial = [] }: { initialQuestion: string; sessionId?: string | null; initial?: Msg[] }) {
+  const router = useRouter();
+  const [messages, setMessages] = useState<Msg[]>(initial);
+  const session = useRef<string | null>(sessionId);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -45,7 +49,7 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, history }),
+        body: JSON.stringify({ question: q, history, sessionId: session.current }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "Falha ao perguntar." }));
@@ -57,6 +61,8 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
       } catch {
         /* sem fontes */
       }
+      const isNew = !session.current;
+      session.current = res.headers.get("X-Session") ?? session.current;
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let text = "";
@@ -66,6 +72,8 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
         text += decoder.decode(value, { stream: true });
         setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: text, sources }]);
       }
+      // Conversa nova já salva: o endereço passa a apontar para ela (e o histórico ao lado a mostra)
+      if (isNew && session.current) router.replace(`/ask?s=${session.current}`, { scroll: false });
     } catch (err) {
       setMessages((m) => [...m.slice(0, -1), { role: "assistant", content: `**Erro:** ${err instanceof Error ? err.message : String(err)}` }]);
     } finally {
@@ -79,7 +87,7 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
         <h1 className="display text-3xl md:text-4xl">
           Perguntar às notas
         </h1>
-        <p className="mt-1 text-muted">O Claude responde usando só as suas notas e transcrições, e cita de onde tirou.</p>
+        <p className="mt-1 text-muted">O Claude responde usando a base de conhecimento, as suas notas e transcrições, e cita de onde tirou.</p>
       </header>
 
       <div className="flex flex-1 flex-col gap-5">
@@ -113,16 +121,21 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
               )}
               {m.sources && m.sources.length > 0 && m.content && (
                 <details className="text-xs text-faint">
-                  <summary className="cursor-pointer select-none">Notas consultadas ({m.sources.length})</summary>
+                  <summary className="cursor-pointer select-none">Fontes consultadas ({m.sources.length})</summary>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {m.sources.map((s) => (
-                      <Link key={s.id} href={`/notes/${s.id}`} className="rounded-md border border-line px-2 py-0.5 hover:border-accent hover:text-ink">
-                        {s.title}
+                      <Link
+                        key={s.id}
+                        href={s.kb ? `/knowledge/${s.id}` : `/notes/${s.id}`}
+                        className={`rounded-md border px-2 py-0.5 hover:border-accent hover:text-ink ${s.kb ? "border-accent/50 text-accent" : "border-line"}`}
+                      >
+                        {s.kb ? `Base: ${s.title}` : s.title}
                       </Link>
                     ))}
                   </div>
                 </details>
               )}
+              {m.content && !busy && !m.content.startsWith("**Erro:**") && <SaveToBase question={messages[i - 1]?.content ?? ""} answer={m.content} session={session.current} />}
             </div>
           ),
         )}
@@ -157,5 +170,37 @@ export function AskView({ initialQuestion }: { initialQuestion: string }) {
         </button>
       </form>
     </div>
+  );
+}
+
+/** Resposta definitiva vai para a base de conhecimento (e o Perguntar passa a usá-la primeiro). */
+function SaveToBase({ question, answer, session }: { question: string; answer: string; session: string | null }) {
+  const [saved, setSaved] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  if (saved)
+    return (
+      <Link href={`/knowledge/${saved}`} className="self-start text-xs text-accent hover:underline">
+        Salvo na base de conhecimento →
+      </Link>
+    );
+  return (
+    <button
+      type="button"
+      disabled={saving}
+      onClick={async () => {
+        setSaving(true);
+        try {
+          setSaved(await answerToKnowledge(question, answer, session));
+        } catch {
+          alert("Não deu para salvar. A base de conhecimento precisa do SQL novo no Supabase.");
+        } finally {
+          setSaving(false);
+        }
+      }}
+      title="Marca esta resposta como definitiva: ela vai para a base de conhecimento"
+      className="self-start rounded-md border border-line px-2 py-0.5 text-xs text-muted hover:border-accent hover:text-ink disabled:opacity-50"
+    >
+      {saving ? "Salvando…" : "Salvar na base de conhecimento"}
+    </button>
   );
 }

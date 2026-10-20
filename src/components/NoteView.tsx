@@ -17,7 +17,7 @@ import { Transcript } from "@/components/Transcript";
 import { TopicChip } from "@/components/TopicChip";
 import { CoverPicker } from "@/components/CoverPicker";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
-import { deleteNote } from "@/lib/work-actions";
+import { deleteNote, noteToKnowledge } from "@/lib/work-actions";
 
 export interface NoteTopic {
   id: string;
@@ -457,13 +457,25 @@ export function NoteView({
               <Icon name="sparkle" className="h-4 w-4 text-accent" />
               Análise do Claude
             </h2>
-            <button
-              onClick={runAnalysis}
-              disabled={busy || processing}
-              className="rounded-md bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink disabled:opacity-50"
-            >
-              {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar"}
-            </button>
+            <div className="flex flex-wrap justify-end gap-2">
+              {hasAnalysis && (
+                <form action={noteToKnowledge.bind(null, note.id)}>
+                  <button
+                    className="rounded-md bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink"
+                    title="O que está nesta nota é definitivo: resumo, decisões e texto vão para a base de conhecimento"
+                  >
+                    Salvar na base
+                  </button>
+                </form>
+              )}
+              <button
+                onClick={runAnalysis}
+                disabled={busy || processing}
+                className="rounded-md bg-surface px-3 py-1 text-sm text-muted transition hover:text-ink disabled:opacity-50"
+              >
+                {busy ? "Analisando…" : hasAnalysis ? "Reanalisar" : "Analisar"}
+              </button>
+            </div>
           </div>
 
           {analyzeError && <p className="mb-2 text-xs text-rec">{analyzeError}</p>}
