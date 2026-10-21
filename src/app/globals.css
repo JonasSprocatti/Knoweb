@@ -14,7 +14,7 @@
   --line: #e4ddd2;
   --ink: #1f1b16;
   --muted: #5f574c;
-  --faint: #8a8073;
+  --faint: #756b5f;
   --topic: #2f7d73;
   --rec: #d23c32;
 }
@@ -29,7 +29,7 @@
     --line: #2f2b24;
     --ink: #ece6dc;
     --muted: #b3aa9c;
-    --faint: #8a8174;
+    --faint: #958c7f;
     --topic: #6cc3b5;
     --rec: #f0584d;
   }
@@ -42,7 +42,7 @@
   --line: #2f2b24;
   --ink: #ece6dc;
   --muted: #b3aa9c;
-  --faint: #8a8174;
+  --faint: #958c7f;
   --topic: #6cc3b5;
   --rec: #f0584d;
 }
@@ -395,9 +395,40 @@ html[data-nav] body::before {
   z-index: 60;
   height: 2px;
   background: var(--accent);
-  box-shadow: 0 0 8px var(--accent);
   transform-origin: left;
   animation: nav-progress 2.4s cubic-bezier(0.1, 0.7, 0.2, 1) 0.12s both;
+}
+
+/* Números de um projeto, pessoa ou sprint: um cartão só, dividido por linhas finas
+   (em vez de uma caixa por número). Em 2 colunas, um número sobrando ocupa a linha toda. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--line);
+}
+.stats > * {
+  background: var(--panel);
+  padding: 0.625rem 1rem 0.75rem;
+}
+.stats > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+@media (min-width: 640px) {
+  .stats {
+    grid-template-columns: repeat(var(--stats-sm, 3), minmax(0, 1fr));
+  }
+  .stats > :last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+}
+@media (min-width: 1024px) {
+  .stats {
+    grid-template-columns: repeat(var(--stats-lg, var(--stats-sm, 3)), minmax(0, 1fr));
+  }
 }
 
 /* Fileira de filtros: no celular rola de lado em vez de quebrar uma palavra sozinha na linha de baixo */

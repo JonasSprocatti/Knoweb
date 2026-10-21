@@ -207,7 +207,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </details>
       </header>
 
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <dl className="stats [--stats-lg:6]">
         <Stat label="Progresso"><Progress done={done.length} total={real.length} color={color} /></Stat>
         <Stat label="Em aberto">{real.length - done.length}</Stat>
         <Stat label="Atrasadas"><span className={overdue ? "text-rec" : ""}>{overdue}</span></Stat>
@@ -351,9 +351,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-line bg-panel px-3 py-2">
-      <dt className="text-xs text-faint">{label}</dt>
-      <dd className="mt-0.5 text-lg font-semibold tabular-nums text-ink">{children}</dd>
+    <div>
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="mt-1 text-xl font-semibold tabular-nums text-ink">{children}</dd>
     </div>
   );
 }

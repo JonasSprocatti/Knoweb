@@ -6,7 +6,7 @@ import { useEffect, type MutableRefObject } from "react";
 
 /** Grafo 3D (three.js), com um céu de estrelas em volta. Carregado só quando o modo 3D é ligado. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function GraphCanvas3D({ fgRef, ...props }: { fgRef: MutableRefObject<any> } & Record<string, any>) {
+export default function GraphCanvas3D({ fgRef, starColor = "#dce3ff", ...props }: { fgRef: MutableRefObject<any>; starColor?: string } & Record<string, any>) {
   useEffect(() => {
     const scene = fgRef.current?.scene?.();
     if (!scene) return;
@@ -14,13 +14,13 @@ export default function GraphCanvas3D({ fgRef, ...props }: { fgRef: MutableRefOb
     for (let i = 0; i < positions.length; i++) positions[i] = (Math.random() - 0.5) * 6000;
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const stars = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xdce3ff, size: 2, sizeAttenuation: false }));
+    const stars = new THREE.Points(geometry, new THREE.PointsMaterial({ color: starColor, size: 2, sizeAttenuation: false }));
     scene.add(stars);
     return () => {
       scene.remove(stars);
       geometry.dispose();
     };
-  }, [fgRef]);
+  }, [fgRef, starColor]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Graph = ForceGraph3D as unknown as React.ComponentType<any>;

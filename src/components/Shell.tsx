@@ -118,7 +118,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-3 rounded-md px-2.5 py-2 transition ${
-                  active ? "bg-panel font-medium text-ink shadow-[inset_2px_0_0_var(--accent)]" : "text-muted hover:bg-panel hover:text-ink"
+                  active ? "bg-panel font-medium text-ink ring-1 ring-line" : "text-muted hover:bg-panel hover:text-ink"
                 }`}
               >
                 <Icon name={item.icon} className={`h-[18px] w-[18px] ${item.href === "/record" ? "text-rec" : active ? "text-accent" : ""}`} />
@@ -147,7 +147,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       {/* ---------------- Conteúdo ---------------- */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topo (celular) */}
-        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg/95 px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-line bg-bg px-4 pb-2 pt-[max(0.6rem,env(safe-area-inset-top))] md:hidden">
           {TOP.has(path) ? (
             <Link href="/" className="shrink-0" aria-label="Knoweb, início">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -178,7 +178,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
       </div>
 
       {/* ---------------- Navegação inferior (celular) ---------------- */}
-      <nav className="mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav className="mobile-nav fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] md:hidden">
         <div className="mx-auto grid max-w-md grid-cols-5">
           {MOBILE_NAV.map((href) => {
             const item = NAV.find((n) => n.href === href)!;
@@ -186,7 +186,7 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
             if (href === "/record") {
               return (
                 <Link key={href} href={href} className="press flex flex-col items-center justify-center py-1.5" aria-label="Gravar">
-                  <span className="-mt-6 flex h-15 w-15 items-center justify-center rounded-full bg-rec text-white shadow-lg shadow-rec/30 ring-4 ring-bg">
+                  <span className="-mt-6 flex h-15 w-15 items-center justify-center rounded-full bg-rec text-white ring-4 ring-surface">
                     <Icon name="mic" className="h-6 w-6" />
                   </span>
                 </Link>
