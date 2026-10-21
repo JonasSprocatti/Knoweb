@@ -314,24 +314,30 @@ Analise a nota e chame a ferramenta salvar_analise.`;
         (u) => trackGemini(supabase, "analyze", GEMINI_MODEL, u),
       );
     } else {
-      const response = await anthropic().messages.create({
-        model: CLAUDE_MODEL,
-        max_tokens: 4096,
-        system: SYSTEM,
-        tools: [ANALYSIS_TOOL],
-        tool_choice: { type: "auto" }, // os modelos novos (Sonnet 5.5) recusam tool_choice forçado; o prompt pede a ferramenta
-        messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: catalog, cache_control: { type: "ephemeral" } },
-              { type: "text", text: team, ...(trimPeople || trimProjects ? {} : { cache_control: { type: "ephemeral" as const } }) },
-              { type: "text", text: notePrompt },
-            ],
-          },
-        ],
-      });
+      // O raciocínio do modelo conta dentro de max_tokens: com 4096, reuniões longas cortavam a
+      // análise depois do resumo (sem tarefas, temas nem pessoas). Streaming evita o timeout do SDK.
+      const response = await anthropic()
+        .messages.stream({
+          model: CLAUDE_MODEL,
+          max_tokens: 32_000,
+          system: SYSTEM,
+          tools: [ANALYSIS_TOOL],
+          tool_choice: { type: "auto" }, // os modelos novos (Sonnet 5.5) recusam tool_choice forçado; o prompt pede a ferramenta
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: catalog, cache_control: { type: "ephemeral" } },
+                { type: "text", text: team, ...(trimPeople || trimProjects ? {} : { cache_control: { type: "ephemeral" as const } }) },
+                { type: "text", text: notePrompt },
+              ],
+            },
+          ],
+        })
+        .finalMessage();
       await trackClaude(supabase, "analyze", CLAUDE_MODEL, response.usage);
+      // Análise cortada no meio não é salva: a nota fica com erro e dá para reanalisar
+      if (response.stop_reason === "max_tokens") throw new Error("A análise ficou longa demais e saiu cortada. Tente reanalisar.");
       const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
       if (!toolUse) throw new Error("O Claude não devolveu a análise.");
       result = toolUse.input as AnalysisResult;
