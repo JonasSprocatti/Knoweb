@@ -51,11 +51,6 @@ export interface GraphTheme {
   label: string;
   /** Cor do nome de temas e projetos (padrão: `label`) */
   hubLabel?: (n: SimNode) => string;
-  /**
-   * Cores da barra, dos filtros e da linha do tempo por cima da teia, para o visual
-   * não ficar com uma faixa de outra cor em cima. Sem isto, seguem o tema do app.
-   */
-  chrome?: Chrome;
   /** Cor do céu de pontos no modo 3D (padrão: branco azulado) */
   stars?: string;
   /** Precisa redesenhar continuamente (brilho, deriva) */
@@ -86,18 +81,6 @@ export interface GraphTheme {
   /** Desenha por cima de tudo (antes dos nomes da teia), no espaço do grafo */
   overlay?: (ctx: CanvasRenderingContext2D, scene: Scene) => void;
   node: (ctx: CanvasRenderingContext2D, n: SimNode, s: NodeState) => void;
-}
-
-export interface Chrome {
-  scheme: "light" | "dark";
-  surface: string;
-  panel: string;
-  line: string;
-  ink: string;
-  muted: string;
-  faint: string;
-  accent: string;
-  onAccent: string;
 }
 
 // ---- Cores ----------------------------------------------------------
@@ -642,17 +625,6 @@ const relevo: GraphTheme = {
   name: "Relevo",
   bg: PAPER,
   label: RELEVO_INK,
-  chrome: {
-    scheme: "light",
-    surface: "#F3F4EE",
-    panel: "#FAFBF7",
-    line: "#D3D6C8",
-    ink: RELEVO_INK,
-    muted: "#55534A",
-    faint: "#66645A",
-    accent: "#6B4F36",
-    onAccent: "#FFFFFF",
-  },
   animated: false,
   emoji: false,
   curvature: 0,
@@ -723,17 +695,6 @@ const sinapse: GraphTheme = {
   bg: SIN_BG,
   label: "#ECEAE6",
   hubLabel: (n) => mix(colorOf(n), "#F4F2EE", 0.55),
-  chrome: {
-    scheme: "dark",
-    surface: "#111215",
-    panel: "#17181C",
-    line: "#26282E",
-    ink: "#ECEAE6",
-    muted: "#A9A6A0",
-    faint: "#908D87",
-    accent: SIGNAL,
-    onAccent: "#1F1606",
-  },
   stars: "#8F8C86",
   animated: true,
   emoji: false,
@@ -814,17 +775,6 @@ const abissal: GraphTheme = {
   label: "#C9FFF4",
   // A cor do tema clareada: o nome continua daquele tema, mas legível no escuro
   hubLabel: (n) => mix(colorOf(n), "#E6FFFA", 0.4),
-  chrome: {
-    scheme: "dark",
-    surface: "#041A22",
-    panel: "#08242D",
-    line: "#123640",
-    ink: "#D8F7F0",
-    muted: "#93BDB4",
-    faint: "#79A39A",
-    accent: ABISSAL_GLOW,
-    onAccent: "#02201A",
-  },
   stars: ABISSAL_GLOW,
   animated: true,
   curvature: 0.08,

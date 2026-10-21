@@ -25,6 +25,11 @@ const TYPES: { type: NodeType; label: string }[] = [
   { type: "system", label: "Sistemas" },
 ];
 const ALL_TYPES = TYPES.map((t) => t.type);
+const PRESETS: { label: string; types: NodeType[] }[] = [
+  { label: "Tudo", types: ALL_TYPES },
+  { label: "Trabalho", types: ["project", "task"] },
+  { label: "Conhecimento", types: ["note", "recording", "topic"] },
+];
 // Ao focar num projeto, a busca segue por tarefas e notas, mas não atravessa temas, pessoas e sprints
 // (eles ligam tudo a tudo e trariam a teia inteira de volta)
 const PASS_THROUGH = new Set<NodeType>(["task", "note", "recording"]);
@@ -215,22 +220,6 @@ export function GraphView() {
     fitted.current = true;
     fgRef.current?.zoomToFit?.(500, fitPad());
   };
-  // O visual pinta também a barra e os controles por cima da teia (troca as cores do app só aqui dentro)
-  const chromeStyle = useMemo(() => {
-    const c = theme.chrome;
-    if (!c) return undefined;
-    return {
-      colorScheme: c.scheme,
-      "--surface": c.surface,
-      "--panel": c.panel,
-      "--line": c.line,
-      "--ink": c.ink,
-      "--muted": c.muted,
-      "--faint": c.faint,
-      "--accent": c.accent,
-      "--on-accent": c.onAccent,
-    } as React.CSSProperties;
-  }, [theme]);
   const toggleType = (t: NodeType) => setTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t]);
   const filtered = types.length < ALL_TYPES.length || !!focus || hideOrphans || !showAi;
 
@@ -356,7 +345,7 @@ export function GraphView() {
   };
 
   return (
-    <div className="-mx-4 -mb-28 -mt-5 flex h-[calc(100dvh-7.5rem)] flex-col text-ink md:-mx-10 md:-mb-12 md:-mt-8 md:h-dvh" style={chromeStyle}>
+    <div className="-mx-4 -mb-28 -mt-5 flex h-[calc(100dvh-7.5rem)] flex-col text-ink md:-mx-10 md:-mb-12 md:-mt-8 md:h-dvh">
       <div className="relative z-10 border-b border-line bg-surface text-sm">
         <div className="flex items-center gap-2 px-4 py-2 md:px-6">
           <form
@@ -402,18 +391,25 @@ export function GraphView() {
           <div className="absolute inset-x-0 top-full flex flex-col gap-3 border-b border-line bg-surface px-4 py-3 shadow-lg md:px-6">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-xs text-faint">Mostrar</span>
+              {/* Atalhos no mesmo formato do seletor de visual; acende o que bate com os tipos ligados */}
+              <div role="group" aria-label="Atalhos de tipos" className="mr-1.5 flex gap-0.5 rounded-md border border-line bg-panel p-0.5">
+                {PRESETS.map((p) => {
+                  const on = p.types.length === types.length && p.types.every((t) => types.includes(t));
+                  return (
+                    <button
+                      key={p.label}
+                      onClick={() => setTypes(p.types)}
+                      aria-pressed={on}
+                      className={`rounded px-2.5 py-1 transition ${on ? "bg-surface font-medium text-ink" : "text-muted hover:text-ink"}`}
+                    >
+                      {p.label}
+                    </button>
+                  );
+                })}
+              </div>
               {TYPES.map((t) => (
                 <Toggle key={t.type} on={types.includes(t.type)} set={() => toggleType(t.type)} label={t.label} />
               ))}
-              <button onClick={() => setTypes(ALL_TYPES)} className="ml-1 text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
-                tudo
-              </button>
-              <button onClick={() => setTypes(["project", "task"])} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
-                só trabalho
-              </button>
-              <button onClick={() => setTypes(["note", "recording", "topic"])} className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline">
-                só conhecimento
-              </button>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-xs text-faint">Visual</span>
