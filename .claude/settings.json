@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "taste-skill": {
+      "source": {
+        "source": "github",
+        "repo": "leonxlnx/taste-skill"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "taste-skill@taste-skill": true
+  }
+}
