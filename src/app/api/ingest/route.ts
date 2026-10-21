@@ -40,7 +40,7 @@ async function readFile(supabase: SupabaseClient, blob: Blob, name: string): Pro
   const msg = await anthropic()
     .messages.stream({
       model: CLAUDE_MODEL,
-      max_tokens: 16000, // ponytail: documentos muito longos saem cortados; dividir por páginas se acontecer
+      max_tokens: 32_000, // ponytail: documentos muito longos saem cortados; dividir por páginas se acontecer
       system: SYSTEM,
       messages: [{ role: "user", content: [block, { type: "text", text: `Arquivo: ${name}` }] }],
     })
