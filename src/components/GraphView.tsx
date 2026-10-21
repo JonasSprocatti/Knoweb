@@ -199,6 +199,22 @@ export function GraphView() {
     fitted.current = true;
     fgRef.current?.zoomToFit?.(500, 60);
   };
+  // O visual pinta também a barra e os controles por cima da teia (troca as cores do app só aqui dentro)
+  const chromeStyle = useMemo(() => {
+    const c = theme.chrome;
+    if (!c) return undefined;
+    return {
+      colorScheme: c.scheme,
+      "--surface": c.surface,
+      "--panel": c.panel,
+      "--line": c.line,
+      "--ink": c.ink,
+      "--muted": c.muted,
+      "--faint": c.faint,
+      "--accent": c.accent,
+      "--on-accent": c.onAccent,
+    } as React.CSSProperties;
+  }, [theme]);
   const toggleType = (t: NodeType) => setTypes(types.includes(t) ? types.filter((x) => x !== t) : [...types, t]);
   const filtered = types.length < ALL_TYPES.length || !!focus || hideOrphans || !showAi;
 
@@ -254,7 +270,7 @@ export function GraphView() {
   const particles = (l: SimLink) => (reduced ? 0 : theme.particles(l));
 
   return (
-    <div className="-mx-4 -mb-28 -mt-5 flex h-[calc(100dvh-7.5rem)] flex-col md:-mx-8 md:-mb-10 md:-mt-8 md:h-dvh">
+    <div className="-mx-4 -mb-28 -mt-5 flex h-[calc(100dvh-7.5rem)] flex-col text-ink md:-mx-10 md:-mb-12 md:-mt-8 md:h-dvh" style={chromeStyle}>
       <div className="relative z-10 border-b border-line bg-surface text-sm">
         <div className="flex items-center gap-2 px-4 py-2 md:px-6">
           <form
@@ -315,7 +331,7 @@ export function GraphView() {
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-xs text-faint">Visual</span>
-              <div role="radiogroup" aria-label="Visual da teia" className="flex flex-wrap gap-0.5 rounded-md border border-line bg-panel p-0.5">
+              <div role="radiogroup" aria-label="Visual da teia" className="chips max-w-full !gap-0.5 rounded-md border border-line bg-panel p-0.5">
                 {THEME_LIST.map((t) => (
                   <button
                     key={t.id}
@@ -361,6 +377,7 @@ export function GraphView() {
             height={size.h}
             graphData={data}
             backgroundColor={theme.bg}
+            starColor={theme.stars}
             nodeId="id"
             nodeLabel={tooltip}
             nodeColor={(n: SimNode) => n.color}
@@ -461,7 +478,7 @@ export function GraphView() {
                 ctx.font = `${isHub(node) ? 650 : 450} ${fontSize}px ${font}`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "top";
-                ctx.fillStyle = isHub(node) ? node.color : theme.label;
+                ctx.fillStyle = isHub(node) ? (theme.hubLabel?.(node) ?? node.color) : theme.label;
                 const label = node.label.length > 40 ? `${node.label.slice(0, 38)}…` : node.label;
                 // Contorno da cor do fundo: o nome continua legível por cima das linhas
                 ctx.lineJoin = "round";
@@ -483,14 +500,14 @@ export function GraphView() {
         )}
 
         {times.length > 1 && (
-          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-md border border-line bg-panel/95 px-3 py-2 text-sm text-ink backdrop-blur md:inset-x-auto md:left-6 md:w-[28rem]">
+          <div className="absolute inset-x-3 bottom-3 flex items-center gap-3 rounded-md border border-line bg-panel px-3 py-2 text-sm text-ink md:inset-x-auto md:left-6 md:w-[28rem]">
             <button
               onClick={() => {
                 if (playing) return setPlaying(false);
                 setStep(0);
                 setPlaying(true);
               }}
-              className="shrink-0 rounded-md bg-surface px-3 py-1 hover:bg-line"
+              className="shrink-0 rounded-md border border-line bg-surface px-3 py-1 hover:border-accent hover:text-accent"
             >
               {playing ? "Parar" : "Ver crescer"}
             </button>

@@ -20,6 +20,15 @@ export interface GraphTheme {
   name: string;
   bg: string;
   label: string;
+  /** Cor do nome de temas e projetos (padrão: a cor do próprio ponto) */
+  hubLabel?: (n: SimNode) => string;
+  /**
+   * Cores da barra, dos filtros e da linha do tempo por cima da teia, para o visual
+   * não ficar com uma faixa de outra cor em cima. Sem isto, seguem o tema do app.
+   */
+  chrome?: Chrome;
+  /** Cor do céu de pontos no modo 3D (padrão: branco azulado) */
+  stars?: string;
   /** Precisa redesenhar continuamente (brilho, deriva) */
   animated: boolean;
   /** O próprio tema escreve o nome deste ponto (a teia não põe rótulo nem emoji por cima) */
@@ -34,6 +43,18 @@ export interface GraphTheme {
   /** Desenha antes dos nós. Recebe o contexto já no espaço do grafo. */
   backdrop: (ctx: CanvasRenderingContext2D, t: number, scale: number, nodes: SimNode[]) => void;
   node: (ctx: CanvasRenderingContext2D, n: SimNode, s: NodeState) => void;
+}
+
+export interface Chrome {
+  scheme: "light" | "dark";
+  surface: string;
+  panel: string;
+  line: string;
+  ink: string;
+  muted: string;
+  faint: string;
+  accent: string;
+  onAccent: string;
 }
 
 const end = (e: string | SimNode) => (typeof e === "string" ? null : e);
@@ -52,7 +73,8 @@ const STARS: Star[] = Array.from({ length: 260 }, (_, i) => {
   return { x: rnd(1), y: rnd(2), size: 0.4 + rnd(3) * 1.4, phase: rnd(4) * Math.PI * 2, depth: 0.02 + rnd(5) * 0.08 };
 });
 
-function sky(ctx: CanvasRenderingContext2D, t: number, color: string, twinkle: boolean) {
+/** `fall`: pixels por segundo que o céu desce (neve marinha no Abissal); os mais próximos caem mais rápido. */
+function sky(ctx: CanvasRenderingContext2D, t: number, color: string, twinkle: boolean, fall = 0) {
   const m = ctx.getTransform();
   const { width: w, height: h } = ctx.canvas;
   const dpr = typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
@@ -61,7 +83,8 @@ function sky(ctx: CanvasRenderingContext2D, t: number, color: string, twinkle: b
   ctx.fillStyle = color;
   for (const s of STARS) {
     const x = (((s.x * w + m.e * s.depth) % w) + w) % w;
-    const y = (((s.y * h + m.f * s.depth) % h) + h) % h;
+    const drift = fall ? (t / 1000) * fall * dpr * (0.4 + s.depth * 8) : 0;
+    const y = (((s.y * h + m.f * s.depth + drift) % h) + h) % h;
     ctx.globalAlpha = twinkle ? 0.35 + 0.65 * Math.abs(Math.sin(t / 900 + s.phase)) : 0.6;
     ctx.beginPath();
     ctx.arc(x, y, s.size * dpr, 0, Math.PI * 2);
@@ -96,26 +119,45 @@ function typePath(ctx: CanvasRenderingContext2D, n: SimNode, x: number, y: numbe
 }
 
 const isHubNode = (n: SimNode) => n.type === "topic" || n.type === "project" || n.type === "company" || n.type === "system";
-/** Mistura duas cores #rrggbb (a ligação fica com a cor dos dois lados). */
-function mix(a: string, b: string) {
+/** Mistura duas cores #rrggbb (a ligação fica com a cor dos dois lados); `w` é quanto vem da segunda. */
+function mix(a: string, b: string, w = 0.5) {
   const p = (h: string, i: number) => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16) || 0;
-  return `#${[0, 1, 2].map((i) => Math.round((p(a, i) + p(b, i)) / 2).toString(16).padStart(2, "0")).join("")}`;
+  return `#${[0, 1, 2].map((i) => Math.round(p(a, i) * (1 - w) + p(b, i) * w).toString(16).padStart(2, "0")).join("")}`;
 }
 
 // ---- Temas ---------------------------------------------------------
+/**
+ * Abissal: fundo do mar. Cada ponto é um bicho que brilha e respira devagar; a neve
+ * marinha cai ao fundo. Temas e projetos ganham um anel de luz para se destacarem.
+ */
+const ABISSAL_GLOW = "#5EE6C3";
 const abissal: GraphTheme = {
   id: "abissal",
   name: "Abissal",
   bg: "#021219",
   label: "#C9FFF4",
+  // A cor do tema clareada: o nome continua daquele tema, mas legível no escuro
+  hubLabel: (n) => mix(n.color, "#E6FFFA", 0.4),
+  chrome: {
+    scheme: "dark",
+    surface: "#041A22",
+    panel: "#08242D",
+    line: "#123640",
+    ink: "#D8F7F0",
+    muted: "#93BDB4",
+    faint: "#79A39A",
+    accent: ABISSAL_GLOW,
+    onAccent: "#02201A",
+  },
+  stars: ABISSAL_GLOW,
   animated: true,
   curvature: 0.08,
-  linkColor: (l, lit) => (lit ? alpha(end(l.source)?.color ?? "#5EE6C3", 0.35) : "#5EE6C30a"),
+  linkColor: (l, lit) => (lit ? alpha(end(l.source)?.color ?? ABISSAL_GLOW, 0.35) : "#5EE6C30d"),
   linkWidth: () => 0.7,
   particles: (l) => (l.kind === "topic" ? 1 : 3),
-  particleColor: (l) => end(l.source)?.color ?? "#5EE6C3",
-  backdrop: (ctx, t) => sky(ctx, t / 3, "#5EE6C3", true),
-  node: (ctx, n, { r, lit, t }) => {
+  particleColor: (l) => end(l.source)?.color ?? ABISSAL_GLOW,
+  backdrop: (ctx, t) => sky(ctx, t / 3, ABISSAL_GLOW, true, 4),
+  node: (ctx, n, { r, lit, t, scale }) => {
     const x = n.x ?? 0;
     const y = n.y ?? 0;
     const breath = 0.6 + 0.4 * Math.sin(t / 1100 + y * 0.05);
@@ -127,6 +169,15 @@ const abissal: GraphTheme = {
     circle(ctx, x, y, r * 2.6);
     ctx.fillStyle = g;
     ctx.fill();
+    if (isHubNode(n)) {
+      // Anel que pulsa junto com a respiração, como a borda de uma água-viva
+      circle(ctx, x, y, r * (1.2 + 0.08 * breath));
+      ctx.lineWidth = Math.max(0.6 / scale, r * 0.09);
+      ctx.strokeStyle = alpha(mix(n.color, "#EFFFFB"), 0.35 + 0.35 * breath);
+      ctx.stroke();
+      // Com emoji, o emoji é o núcleo
+      if (n.emoji) return;
+    }
     circle(ctx, x, y, r * 0.55);
     ctx.fillStyle = "#EFFFFB";
     ctx.fill();
@@ -143,6 +194,17 @@ const relevo: GraphTheme = {
   name: "Relevo",
   bg: "#E6ECEE",
   label: RELEVO_INK,
+  chrome: {
+    scheme: "light",
+    surface: "#EEF2F3",
+    panel: "#F8FAFA",
+    line: "#CBD5D9",
+    ink: RELEVO_INK,
+    muted: "#465B66",
+    faint: "#576A74",
+    accent: "#24657A",
+    onAccent: "#FFFFFF",
+  },
   animated: false,
   curvature: 0,
   linkColor: (l, lit) => (lit ? (l.kind === "topic" ? "#1D334033" : "#1D334099") : "#1D33400f"),
@@ -213,6 +275,17 @@ const sinapse: GraphTheme = {
   name: "Sinapse",
   bg: "#0E0B1E",
   label: "#E9E5FF",
+  chrome: {
+    scheme: "dark",
+    surface: "#130F27",
+    panel: "#1A1533",
+    line: "#2A2350",
+    ink: "#E9E5FF",
+    muted: "#B3ABD9",
+    faint: "#9890C4",
+    accent: "#9D8CFF",
+    onAccent: "#140F2B",
+  },
   animated: true,
   curvature: 0.22,
   linkColor: (l, lit) => {

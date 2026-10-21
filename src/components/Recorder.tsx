@@ -414,7 +414,7 @@ export function Recorder({ userId }: { userId: string }) {
             <button
               onClick={start}
               disabled={phase === "starting"}
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-rec text-white shadow-lg shadow-rec/30 transition hover:scale-105 disabled:opacity-60"
+              className="flex h-20 w-20 items-center justify-center rounded-full bg-rec text-white transition hover:scale-105 disabled:opacity-60"
               aria-label="Começar a gravar"
             >
               <span className="h-7 w-7 rounded-full bg-white" />
@@ -438,7 +438,7 @@ export function Recorder({ userId }: { userId: string }) {
               </button>
               <button
                 onClick={stop}
-                className="flex h-20 w-20 items-center justify-center rounded-full bg-rec text-white shadow-lg shadow-rec/30 transition hover:scale-105"
+                className="flex h-20 w-20 items-center justify-center rounded-full bg-rec text-white transition hover:scale-105"
                 aria-label="Parar e processar"
               >
                 <span className="h-7 w-7 rounded-md bg-white" />
