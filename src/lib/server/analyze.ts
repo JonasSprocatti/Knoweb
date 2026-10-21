@@ -303,7 +303,7 @@ ${noteList || "(nenhuma ainda)"}
 ${clip(body, 400_000)}
 </nota>
 
-Analise a nota e chame a ferramenta salvar_analise.`;
+Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os campos preenchidos (tarefas, temas, projetos, pessoas, empresas e sistemas).`;
 
     let result: AnalysisResult;
     if ((await aiProvider()) === "gemini") {
@@ -322,7 +322,9 @@ Analise a nota e chame a ferramenta salvar_analise.`;
           max_tokens: 32_000,
           system: SYSTEM,
           tools: [ANALYSIS_TOOL],
-          tool_choice: { type: "auto" }, // os modelos novos (Sonnet 5.5) recusam tool_choice forçado; o prompt pede a ferramenta
+          // os modelos novos (Sonnet 5.5) recusam tool_choice forçado; o prompt pede a ferramenta.
+          // Uma chamada só: com várias, a análise vinha repartida e só a primeira parte era lida.
+          tool_choice: { type: "auto", disable_parallel_tool_use: true },
           messages: [
             {
               role: "user",
@@ -338,10 +340,13 @@ Analise a nota e chame a ferramenta salvar_analise.`;
       await trackClaude(supabase, "analyze", CLAUDE_MODEL, response.usage);
       // Análise cortada no meio não é salva: a nota fica com erro e dá para reanalisar
       if (response.stop_reason === "max_tokens") throw new Error("A análise ficou longa demais e saiu cortada. Tente reanalisar.");
-      const toolUse = response.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-      if (!toolUse) throw new Error("O Claude não devolveu a análise.");
-      result = toolUse.input as AnalysisResult;
+      const calls = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === ANALYSIS_TOOL.name);
+      if (!calls.length) throw new Error("O Claude não devolveu a análise.");
+      result = mergeCalls(calls.map((c) => c.input as Partial<AnalysisResult>));
     }
+
+    // Sem nenhuma das listas, a análise veio pela metade: melhor dar erro do que salvar só o resumo
+    if (!result.action_items && !result.topics && !result.people) throw new Error("A análise veio incompleta. Tente reanalisar.");
 
     // ---- Temas -------------------------------------------------------
     const wanted = (result.topics ?? [])
@@ -457,6 +462,19 @@ Analise a nota e chame a ferramenta salvar_analise.`;
     await supabase.from("notes").update({ status: "error" }).eq("id", noteId);
     throw err;
   }
+}
+
+/** Junta a análise quando o modelo a manda em mais de uma chamada: listas somam, textos ficam com o primeiro. */
+function mergeCalls(parts: Partial<AnalysisResult>[]): AnalysisResult {
+  const out: Record<string, unknown> = {};
+  for (const part of parts) {
+    for (const [key, value] of Object.entries(part ?? {})) {
+      const prev = out[key];
+      if (Array.isArray(prev) && Array.isArray(value)) out[key] = [...prev, ...value];
+      else if (prev === undefined || prev === null || prev === "") out[key] = value;
+    }
+  }
+  return out as unknown as AnalysisResult;
 }
 
 type Row = { id: string; name: string; slug: string };
