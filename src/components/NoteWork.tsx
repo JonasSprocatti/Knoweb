@@ -43,20 +43,23 @@ export async function NoteWork({
       {(hasPending || suggestedProjects > 0 || suggestedCount > 0) && (
         <section id="criar" className="scroll-mt-20 rounded-md border border-dashed border-accent/60 p-3">
           <h2 className="mb-1 text-base font-semibold">O Claude quer criar</h2>
-          <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Desmarque o que não quer; tarefas e projetos você aceita ou descarta um a um abaixo.</p>
+          <p className="mb-2 text-xs text-muted">Nada disso existe ainda. Desmarque o que não quer e clique no nome para corrigir; tarefas e projetos você aceita ou descarta um a um abaixo.</p>
           {hasPending && (
             <form action={resolvePending.bind(null, noteId)} className="flex flex-col gap-2 text-sm">
               {pending!.topics.length > 0 && (
                 <fieldset className="flex flex-col gap-1">
                   <legend className="mb-1 text-xs font-medium text-muted">Temas novos</legend>
                   {pending!.topics.map((t) => (
-                    <label key={t.slug} className="flex cursor-pointer items-start gap-2">
-                      <input type="checkbox" name="topic" value={t.slug} defaultChecked className="mt-1 accent-accent" />
-                      <span>
-                        {t.emoji} {t.name}
+                    <div key={t.slug} className="flex items-start gap-2">
+                      <input type="checkbox" name="topic" value={t.slug} defaultChecked aria-label={`Criar o tema ${t.name}`} className="mt-1.5 accent-accent" />
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1">
+                          {t.emoji}
+                          <input name={`name:topic:${t.slug}`} defaultValue={t.name} aria-label="Nome do tema" className="-mx-1 w-full min-w-0 rounded border border-transparent bg-transparent px-1 hover:border-line focus:border-accent focus:bg-panel focus:outline-none" />
+                        </span>
                         {t.description && <span className="block text-xs text-faint">{t.description}</span>}
                       </span>
-                    </label>
+                    </div>
                   ))}
                 </fieldset>
               )}
@@ -67,13 +70,13 @@ export async function NoteWork({
                   <fieldset key={kind} className="flex flex-col gap-1">
                     <legend className="mb-1 text-xs font-medium text-muted">{kind === "company" ? "Empresas novas" : "Sistemas novos"}</legend>
                     {list.map((e) => (
-                      <label key={e.slug} className="flex cursor-pointer items-start gap-2">
-                        <input type="checkbox" name="entity" value={`${e.kind}:${e.slug}`} defaultChecked className="mt-1 accent-accent" />
-                        <span>
-                          {e.name}
+                      <div key={e.slug} className="flex items-start gap-2">
+                        <input type="checkbox" name="entity" value={`${e.kind}:${e.slug}`} defaultChecked aria-label={`Criar ${e.name}`} className="mt-1.5 accent-accent" />
+                        <span className="min-w-0 flex-1">
+                          <input name={`name:entity:${e.kind}:${e.slug}`} defaultValue={e.name} aria-label="Nome" className="-mx-1 w-full min-w-0 rounded border border-transparent bg-transparent px-1 hover:border-line focus:border-accent focus:bg-panel focus:outline-none" />
                           {e.description && <span className="block text-xs text-faint">{e.description}</span>}
                         </span>
-                      </label>
+                      </div>
                     ))}
                   </fieldset>
                 );
@@ -82,13 +85,11 @@ export async function NoteWork({
                 <fieldset className="flex flex-col gap-1">
                   <legend className="mb-1 text-xs font-medium text-muted">Pessoas novas</legend>
                   {pending!.people.map((p) => (
-                    <label key={p.slug} className="flex cursor-pointer items-center gap-2">
-                      <input type="checkbox" name="person" value={p.slug} defaultChecked className="accent-accent" />
-                      <span>
-                        {p.name}
-                        {p.task_ids.length > 0 && <span className="text-xs text-faint"> · em {p.task_ids.length} {p.task_ids.length === 1 ? "tarefa" : "tarefas"}</span>}
-                      </span>
-                    </label>
+                    <div key={p.slug} className="flex items-center gap-2">
+                      <input type="checkbox" name="person" value={p.slug} defaultChecked aria-label={`Criar ${p.name}`} className="accent-accent" />
+                      <input name={`name:person:${p.slug}`} defaultValue={p.name} aria-label="Nome da pessoa" className="-mx-1 flex-1 min-w-0 rounded border border-transparent bg-transparent px-1 hover:border-line focus:border-accent focus:bg-panel focus:outline-none" />
+                      {p.task_ids.length > 0 && <span className="shrink-0 text-xs text-faint">em {p.task_ids.length} {p.task_ids.length === 1 ? "tarefa" : "tarefas"}</span>}
+                    </div>
                   ))}
                 </fieldset>
               )}

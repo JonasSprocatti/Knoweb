@@ -501,9 +501,17 @@ export async function resolvePending(noteId: string, form: FormData) {
   const pending = insights.pending;
   if (!pending) return;
   const discard = form.has("discard");
-  const topics = discard ? [] : pending.topics.filter((t) => form.getAll("topic").includes(t.slug));
-  const people = discard ? [] : pending.people.filter((p) => form.getAll("person").includes(p.slug));
-  const ents = discard ? [] : (pending.entities ?? []).filter((e) => form.getAll("entity").includes(`${e.kind}:${e.slug}`));
+  // O nome pode ter sido corrigido no quadro: vale o novo (e o slug sai dele, então um nome que já existe liga ao existente)
+  const renamed = <T extends { name: string; slug: string }>(item: T, key: string): T => {
+    const name = String(form.get(`name:${key}`) ?? "").trim();
+    const slug = name && slugify(name);
+    return name && slug ? { ...item, name, slug } : item;
+  };
+  const topics = discard ? [] : pending.topics.filter((t) => form.getAll("topic").includes(t.slug)).map((t) => renamed(t, `topic:${t.slug}`));
+  const people = discard ? [] : pending.people.filter((p) => form.getAll("person").includes(p.slug)).map((p) => renamed(p, `person:${p.slug}`));
+  const ents = discard
+    ? []
+    : (pending.entities ?? []).filter((e) => form.getAll("entity").includes(`${e.kind}:${e.slug}`)).map((e) => renamed(e, `entity:${e.kind}:${e.slug}`));
 
   if (ents.length) {
     must(await supabase.from("entities").upsert(
