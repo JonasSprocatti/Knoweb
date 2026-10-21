@@ -12,14 +12,16 @@ import { useEffect, type MutableRefObject } from "react";
 export default function GraphCanvas({ fgRef, ...props }: { fgRef: MutableRefObject<any> } & Record<string, any>) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Graph = ForceGraph2D as unknown as React.ComponentType<any>;
-  // Gravidade leve para o centro: pontos soltos ficam por perto em vez de fugir da tela;
-  // repulsão um pouco maior separa os rótulos do miolo
+  // Gravidade leve para o centro (mais forte para pontos sem ligação, que senão ficam
+  // boiando longe e encolhem a teia no enquadramento); repulsão um pouco maior separa os
+  // rótulos do miolo, mas não empurra quem já está longe
   useEffect(() => {
     const fg = fgRef.current;
     if (!fg) return;
-    fg.d3Force("x", forceX(0).strength(0.07));
-    fg.d3Force("y", forceY(0).strength(0.07));
-    fg.d3Force("charge")?.strength(-140);
+    const pull = (n: { weight?: number }) => (n.weight ? 0.07 : 0.3);
+    fg.d3Force("x", forceX(0).strength(pull));
+    fg.d3Force("y", forceY(0).strength(pull));
+    fg.d3Force("charge")?.strength(-140).distanceMax(360);
     fg.d3Force("link")?.distance(48);
     fg.d3ReheatSimulation?.();
   }, [fgRef]);
