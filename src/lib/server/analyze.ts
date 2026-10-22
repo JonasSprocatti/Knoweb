@@ -64,7 +64,7 @@ const ANALYSIS_TOOL: Anthropic.Tool = {
               description:
                 "Quem deve fazer (uma ou mais pessoas), com o nome exato de uma pessoa existente quando for ela. Se a nota não disser, escolha pelo cargo, pelo \"faz\" e pelo histórico de cada pessoa; sem base nenhuma, deixe vazio.",
             },
-            project: { type: ["string", "null"], description: "Nome exato do projeto (existente ou sugerido em projects) a que a tarefa pertence." },
+            project: { type: ["string", "null"], description: "Nome exato do projeto (existente ou sugerido em projects) a que a tarefa pertence. Se ela pode ser de mais de um dos projetos da nota e o texto não deixa claro, use null: a pessoa escolhe." },
             priority: { type: ["string", "null"], description: "low, medium, high ou urgent, pelo tom da conversa." },
             estimate_hours: { type: ["number", "null"], description: "Estimativa de horas para fazer, só se der para inferir com alguma base." },
             recurrence: { type: ["string", "null"], description: "Só se a tarefa se repete: daily, weekdays, weekly, biweekly ou monthly." },
@@ -157,7 +157,8 @@ Regras:
 - Responsáveis: quando a nota diz quem faz, use essa pessoa. Quando não diz, escolha quem combina pelo cargo, pelo que faz e pelas tarefas e projetos que já teve (veja <pessoas_existentes>). A pessoa marcada [VOCÊ] é o dono da base: numa nota escrita, tarefas em primeira pessoa ("vou", "preciso", "tenho que") são dele; numa gravação, só quando estiver claro que é ele (pelo nome ou pelo contexto). Sem base para escolher, deixe sem responsável.
 - Sistemas: ligue cada tarefa, projeto e empresa aos sistemas em que acontece ou que envolve (ex.: tarefa "configurar o endpoint no SAP" → SAP). Use os nomes exatos de <sistemas_existentes> ou dos que você puser em systems.
 - Se a nota começa com um texto seguido de anexos ("## 📎 nome do arquivo"), esse texto é a anotação do dono dizendo o que fazer com o arquivo: use-a para decidir as tarefas, os responsáveis e os prazos.
-- Se houver <projeto_da_nota>, a nota foi enviada dentro desse projeto: inclua-o em projects (is_new=false) e ligue as tarefas a ele, salvo as que forem claramente de outro projeto.`;
+- Se houver <projeto_da_nota>, a nota foi enviada dentro desse projeto: inclua-o em projects (is_new=false) e ligue as tarefas a ele, salvo as que forem claramente de outro projeto.
+- Quando a nota trata de mais de um projeto, ligue cada tarefa ao dela só se o texto deixar claro; na dúvida, deixe project null em vez de chutar.`;
 
 const DEFAULT_TITLE_RE = /^(Sem título|Gravação \d)/i;
 
@@ -434,7 +435,8 @@ Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os 
     await supabase.from("note_entities").delete().eq("note_id", noteId).eq("source", "ai");
     if (entityLinks.length) await supabase.from("note_entities").upsert(entityLinks, { ignoreDuplicates: true });
 
-    pending.people = await linkWork(supabase, noteId, result, projects ?? [], people ?? [], homeProject?.id ?? null, linkSystems);
+    const work = await linkWork(supabase, noteId, result, projects ?? [], people ?? [], homeProject?.id ?? null, linkSystems);
+    pending.people = work.people;
     if (systemLinks.length) await supabase.from("entity_links").upsert(systemLinks, { onConflict: "entity_id,target_type,target_id", ignoreDuplicates: true });
 
     // ---- Nota --------------------------------------------------------
@@ -445,6 +447,7 @@ Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os 
       people: result.people ?? [],
       questions: result.questions ?? [],
       ...(pending.topics.length || pending.people.length || pending.entities.length ? { pending } : {}),
+      ...(work.undecided ? { task_projects: work.undecided } : {}),
     };
     const update: Record<string, unknown> = {
       summary: result.summary,
@@ -576,7 +579,8 @@ async function linkWork(
   const onlyProject = homeProjectId ?? (projectRows.length === 1 ? projectRows[0].project_id : null);
 
   const fresh = items.filter((a) => !keptTitles.has(a.text.trim().toLowerCase()));
-  if (!fresh.length) return [...newPeople.values()];
+  if (!fresh.length) return { people: [...newPeople.values()], undecided: null };
+  const projectOf = (a: (typeof fresh)[number]) => (a.project && projectId.get(slugify(a.project))) || onlyProject;
   const { data: created } = await supabase
     .from("tasks")
     .insert(
@@ -584,7 +588,7 @@ async function linkWork(
         title: a.text.trim().slice(0, 300),
         description: a.due && !ISO_DATE.test(a.due_date ?? "") ? `Prazo citado: ${a.due}` : "",
         note_id: noteId,
-        project_id: (a.project && projectId.get(slugify(a.project))) || onlyProject,
+        project_id: projectOf(a),
         status: "suggested",
         source: "ai",
         priority: PRIORITIES.has(a.priority ?? "") ? a.priority : "medium",
@@ -604,5 +608,10 @@ async function linkWork(
     }));
   });
   if (assignees.length) await supabase.from("task_assignees").insert(assignees);
-  return [...newPeople.values()];
+  // Vários projetos e a tarefa sem o seu: pergunta para você em vez de deixar solta
+  const doubt = projectRows.length > 1 ? (created ?? []).filter((_, i) => !projectOf(fresh[i])).map((t) => t.id as string) : [];
+  return {
+    people: [...newPeople.values()],
+    undecided: doubt.length ? { task_ids: doubt, options: projectRows.map((r) => r.project_id) } : null,
+  };
 }

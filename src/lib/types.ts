@@ -9,6 +9,8 @@ export interface Insights {
   questions?: string[];
   /** O que a análise quer criar e espera você confirmar na nota */
   pending?: PendingCreations;
+  /** Tarefas sugeridas que podem ser de mais de um projeto: você escolhe (options = ids dos candidatos) */
+  task_projects?: { task_ids: string[]; options: string[] };
 }
 
 export interface PendingCreations {

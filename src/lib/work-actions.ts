@@ -154,6 +154,68 @@ export async function unlinkNote(projectId: string, noteId: string) {
   refresh();
 }
 
+/**
+ * Troca o projeto das tarefas sugeridas de uma nota (quadro "O Claude quer criar").
+ * from:<projeto> = para onde vão as do projeto (from:none = as sem projeto); task:<id> e all
+ * respondem à pergunta de quando o Claude não soube escolher entre vários projetos.
+ * O projeto escolhido fica ligado à nota (manual: reanalisar manda as tarefas para ele) e um
+ * projeto sugerido por esta nota que ficou vazio some.
+ */
+export async function moveNoteTasks(noteId: string, form: FormData) {
+  const supabase = await db();
+  const { data: note } = await supabase.from("notes").select("insights").eq("id", noteId).single();
+  const insights = (note?.insights ?? {}) as Insights;
+  const undecided = new Set(insights.task_projects?.task_ids ?? []);
+  const moves: { taskIds?: string[]; from?: string | null; to: string }[] = [];
+  const all = str(form, "all");
+  for (const id of undecided) {
+    const to = str(form, `task:${id}`) ?? all;
+    if (to) moves.push({ taskIds: [id], to });
+  }
+  for (const [key, value] of form.entries()) {
+    if (!key.startsWith("from:") || typeof value !== "string" || !value) continue;
+    const from = key.slice(5) === "none" ? null : key.slice(5);
+    if (value !== from) moves.push({ from, to: value });
+  }
+  if (!moves.length) return;
+
+  const left = new Set<string>();
+  for (const m of moves) {
+    let q = supabase.from("tasks").update({ project_id: m.to }).eq("note_id", noteId).eq("status", "suggested");
+    if (m.taskIds) q = q.in("id", m.taskIds);
+    else if (m.from) {
+      q = q.eq("project_id", m.from);
+      left.add(m.from);
+    } else q = q.is("project_id", null);
+    // As que o Claude não soube escolher continuam esperando a resposta própria
+    if (!m.taskIds && undecided.size) q = q.not("id", "in", `(${[...undecided].join(",")})`);
+    must(await q);
+  }
+  const targets = [...new Set(moves.map((m) => m.to))];
+  must(await supabase.from("project_notes").upsert(
+    targets.map((project_id) => ({ project_id, note_id: noteId, relevance: 1, source: "manual" })),
+    { onConflict: "project_id,note_id" },
+  ));
+
+  // Projeto que só esta nota sugeriu e ficou sem tarefas: era o projeto errado
+  for (const id of left) {
+    if (targets.includes(id)) continue;
+    const { data: p } = await supabase.from("projects").select("status, origin_note_id").eq("id", id).maybeSingle();
+    if (p?.status !== "suggested" || p.origin_note_id !== noteId) continue;
+    const { count } = await supabase.from("tasks").select("id", { count: "exact", head: true }).eq("project_id", id);
+    if (!count) await supabase.from("projects").delete().eq("id", id);
+  }
+
+  if (insights.task_projects) {
+    const answered = new Set(moves.flatMap((m) => m.taskIds ?? []));
+    const rest = insights.task_projects.task_ids.filter((id) => !answered.has(id));
+    if (rest.length) insights.task_projects = { ...insights.task_projects, task_ids: rest };
+    else delete insights.task_projects;
+    must(await supabase.from("notes").update({ insights }).eq("id", noteId));
+  }
+  refresh();
+}
+
 // ---------------------------------------------------------------- Tarefas
 
 export async function saveTask(form: FormData) {
