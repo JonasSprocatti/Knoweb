@@ -1,8 +1,8 @@
 import Link from "@/components/Link";
-import { unlinkEntity, acceptSuggested, deleteProject, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
+import { unlinkEntity, acceptSuggested, deleteProject, moveNoteTasks, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { EntityKind, PendingCreations } from "@/lib/types";
+import type { EntityKind, Insights, PendingCreations } from "@/lib/types";
 import { ENTITY } from "@/lib/entities";
 import { Icon } from "@/components/Icon";
 import { Markdown } from "@/components/Markdown";
@@ -14,11 +14,13 @@ export async function NoteWork({
   supabase,
   noteId,
   pending,
+  taskProjects,
   versions = [],
 }: {
   supabase: SupabaseClient;
   noteId: string;
   pending?: PendingCreations;
+  taskProjects?: Insights["task_projects"];
   versions?: { id: string; changes: string | null; file_name: string | null; created_at: string }[];
 }) {
   const [{ data: pn }, { data: taskRows }, { data: np }, { data: people }, { data: projects }, { data: entRows }] = await Promise.all([
@@ -26,7 +28,7 @@ export async function NoteWork({
     supabase.from("tasks").select(TASK_COLUMNS).eq("note_id", noteId).order("created_at"),
     supabase.from("note_people").select("people(id, name, slug)").eq("note_id", noteId),
     supabase.from("people").select("id, name, is_me").order("name"),
-    supabase.from("projects").select("id, name, emoji").not("status", "in", "(archived)").order("name"),
+    supabase.from("projects").select("id, name, emoji, status").not("status", "in", "(archived)").order("name"),
     supabase.from("note_entities").select("entities(id, kind, name, slug)").eq("note_id", noteId),
   ]);
   const linked = (pn ?? []).map((r) => one(r.projects as unknown as P | null)).filter((p): p is P => !!p);
@@ -36,6 +38,25 @@ export async function NoteWork({
   const suggestedCount = tasks.filter((t) => t.status === "suggested").length;
 
   const suggestedProjects = linked.filter((p) => p.status === "suggested").length;
+  // Projeto das tarefas sugeridas: as que o Claude não soube onde pôr e os grupos por projeto
+  const choices = (projects ?? []).filter((p) => p.status !== "suggested" || linked.some((l) => l.id === p.id));
+  const suggestedTasks = tasks.filter((t) => t.status === "suggested");
+  const undecided = suggestedTasks.filter((t) => taskProjects?.task_ids.includes(t.id));
+  const candidates = choices.filter((p) => taskProjects?.options.includes(p.id));
+  const others = choices.filter((p) => !taskProjects?.options.includes(p.id));
+  const groups = [...new Map(suggestedTasks.filter((t) => !undecided.includes(t)).map((t) => [t.project_id ?? "none", t.projects])).entries()].map(([id, p]) => ({
+    id,
+    name: p ? `${p.emoji ?? ""} ${p.name}`.trim() : "Sem projeto",
+    count: suggestedTasks.filter((t) => !undecided.includes(t) && (t.project_id ?? "none") === id).length,
+  }));
+  const option = (p: { id: string; name: string; emoji: string | null; status: string }) => (
+    <option key={p.id} value={p.id}>
+      {p.emoji} {p.name}
+      {p.status === "suggested" ? " (sugerido)" : ""}
+    </option>
+  );
+  const select = "max-w-full min-w-0 rounded-md border border-line bg-panel px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none";
+
   const hasPending = !!pending && pending.topics.length + pending.people.length + (pending.entities?.length ?? 0) > 0;
 
   return (
@@ -99,8 +120,60 @@ export async function NoteWork({
               </div>
             </form>
           )}
+          {suggestedTasks.length > 0 && choices.length > 0 && (
+            <form action={moveNoteTasks.bind(null, noteId)} className={`flex flex-col gap-2 text-sm ${hasPending ? "mt-3 border-t border-line pt-3" : ""}`}>
+              <h3 className="text-xs font-medium text-muted">Projeto das tarefas</h3>
+              {undecided.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-md border border-accent/60 bg-panel p-2.5">
+                  <p className="text-sm text-ink">
+                    {undecided.length === 1 ? "Uma tarefa pode" : `${undecided.length} tarefas podem`} ser de mais de um projeto. Para qual {undecided.length === 1 ? "ela vai" : "elas vão"}?
+                  </p>
+                  <label className="flex flex-wrap items-center gap-2">
+                    <span className="text-muted">{undecided.length === 1 ? "Para" : "Todas para"}</span>
+                    <select name="all" defaultValue="" aria-label="Projeto das tarefas" className={select}>
+                      <option value="">Escolher projeto</option>
+                      {candidates.map(option)}
+                      {others.length > 0 && <optgroup label="Outros projetos">{others.map(option)}</optgroup>}
+                    </select>
+                  </label>
+                  {undecided.length > 1 && (
+                    <details>
+                      <summary className="cursor-pointer text-xs text-muted hover:text-ink">Escolher uma a uma</summary>
+                      <ul className="mt-2 flex flex-col gap-1.5">
+                        {undecided.map((t) => (
+                          <li key={t.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                            <span className="min-w-0 flex-1 basis-48">{t.title}</span>
+                            <select name={`task:${t.id}`} defaultValue="" aria-label={`Projeto de ${t.title}`} className={select}>
+                              <option value="">Como as outras</option>
+                              {candidates.map(option)}
+                              {others.length > 0 && <optgroup label="Outros projetos">{others.map(option)}</optgroup>}
+                            </select>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              )}
+              {groups.map((g) => (
+                <label key={g.id} className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted">
+                    {g.count} {g.count === 1 ? "tarefa" : "tarefas"} em
+                  </span>
+                  <select name={`from:${g.id}`} defaultValue={g.id === "none" ? "" : g.id} aria-label={`Projeto das tarefas em ${g.name}`} className={select}>
+                    {g.id === "none" && <option value="">Sem projeto</option>}
+                    {g.id !== "none" && !choices.some((p) => p.id === g.id) && <option value={g.id}>{g.name}</option>}
+                    {choices.map(option)}
+                  </select>
+                </label>
+              ))}
+              <div>
+                <button className="rounded bg-accent px-2.5 py-0.5 text-xs font-semibold text-on-accent">Mover tarefas</button>
+              </div>
+            </form>
+          )}
           {(suggestedProjects > 0 || suggestedCount > 0) && (
-            <p className={`text-xs text-muted ${hasPending ? "mt-3" : ""}`}>
+            <p className={`text-xs text-muted ${hasPending || suggestedTasks.length > 0 ? "mt-3" : ""}`}>
               {[suggestedProjects && `${suggestedProjects} ${suggestedProjects === 1 ? "projeto" : "projetos"}`, suggestedCount && `${suggestedCount} ${suggestedCount === 1 ? "tarefa" : "tarefas"}`]
                 .filter(Boolean)
                 .join(" e ")}{" "}
