@@ -708,6 +708,43 @@ export async function unlinkSystem(entityId: string, type: string, targetId: str
   refresh();
 }
 
+/** Liga uma pessoa ao projeto: escolhida na lista ou criada pelo nome. */
+export async function linkProjectPerson(projectId: string, form: FormData) {
+  const supabase = await db();
+  const name = str(form, "new_name");
+  const personId = str(form, "person_id") ?? (name ? await personByName(supabase, name) : null);
+  if (!personId) return;
+  must(await supabase.from("project_people").upsert({ project_id: projectId, person_id: personId }, { onConflict: "project_id,person_id" }));
+  refresh();
+}
+
+export async function unlinkProjectPerson(projectId: string, personId: string) {
+  const supabase = await db();
+  must(await supabase.from("project_people").delete().eq("project_id", projectId).eq("person_id", personId));
+  refresh();
+}
+
+/** Liga um tema ao projeto: escolhido na lista ou criado pelo nome. */
+export async function linkProjectTopic(projectId: string, form: FormData) {
+  const supabase = await db();
+  let topicId = str(form, "topic_id");
+  const name = str(form, "new_name");
+  if (!topicId && name) {
+    const slug = slugify(name) || "sem-nome";
+    const found = await supabase.from("topics").select("id").eq("slug", slug).maybeSingle();
+    topicId = (found.data?.id as string | undefined) ?? (must(await supabase.from("topics").insert({ name, slug }).select("id").single()).id as string);
+  }
+  if (!topicId) return;
+  must(await supabase.from("project_topics").upsert({ project_id: projectId, topic_id: topicId }, { onConflict: "project_id,topic_id" }));
+  refresh();
+}
+
+export async function unlinkProjectTopic(projectId: string, topicId: string) {
+  const supabase = await db();
+  must(await supabase.from("project_topics").delete().eq("project_id", projectId).eq("topic_id", topicId));
+  refresh();
+}
+
 /** Edita o tema: nome (o endereço acompanha), emoji, descrição e cor. */
 export async function saveTopic(id: string, form: FormData) {
   const supabase = await db();

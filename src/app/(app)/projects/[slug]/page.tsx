@@ -8,7 +8,20 @@ import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { acceptSuggested, createProjectDoc, deleteProject, linkNote, saveProject, setProjectStatus, templateFromProject, unlinkNote } from "@/lib/work-actions";
+import {
+  acceptSuggested,
+  createProjectDoc,
+  deleteProject,
+  linkNote,
+  linkProjectPerson,
+  linkProjectTopic,
+  saveProject,
+  setProjectStatus,
+  templateFromProject,
+  unlinkNote,
+  unlinkProjectPerson,
+  unlinkProjectTopic,
+} from "@/lib/work-actions";
 import {
   Calendar,
   cycleDays,
@@ -50,7 +63,7 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     .maybeSingle();
   if (!project) notFound();
 
-  const [{ data: taskRows }, { data: links }, { data: people }, { data: projects }, { data: recentNotes }] = await Promise.all([
+  const [{ data: taskRows }, { data: links }, { data: people }, { data: projects }, { data: recentNotes }, { data: allTopics }, manualPeople, manualTopics] = await Promise.all([
     supabase.from("tasks").select(TASK_COLUMNS).eq("project_id", project.id).order("created_at"),
     supabase
       .from("project_notes")
@@ -59,7 +72,12 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
     supabase.from("people").select("id, name, is_me").order("name"),
     supabase.from("projects").select("id, name, emoji").neq("status", "archived").order("name"),
     supabase.from("notes").select("id, title").order("updated_at", { ascending: false }).limit(60),
+    supabase.from("topics").select("id, name").order("name"),
+    // Pessoas e temas ligados à mão (sem as tabelas ainda, vem erro e a página só mostra os automáticos)
+    supabase.from("project_people").select("people(id, name, slug)").eq("project_id", project.id),
+    supabase.from("project_topics").select("topics(id, name, slug, color, emoji)").eq("project_id", project.id),
   ]);
+  const manualReady = !manualPeople.error && !manualTopics.error;
 
   // Documento do projeto na base de conhecimento (sem a tabela ainda, fica null)
   const { data: doc } = await supabase.from("knowledge").select("id, status").eq("kind", "project").eq("project_id", project.id).maybeSingle();
@@ -74,27 +92,41 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
   type JoinedNote = { id: string; title: string; summary: string | null; created_at: string; note_topics: { topics: unknown }[] };
   const notes = (links ?? []).map((l) => ({ ...one(l.notes as unknown as JoinedNote)!, source: l.source as string })).filter((n) => n.id);
 
-  // Temas: vêm das notas ligadas ao projeto
-  const topicCount = new Map<string, { t: { name: string; slug: string; color: string | null; emoji: string | null }; n: number }>();
+  // Temas: vêm das notas ligadas ao projeto, mais os ligados à mão
+  type TopicRow = { id: string; name: string; slug: string; color: string | null; emoji: string | null };
+  const topicCount = new Map<string, { t: TopicRow; n: number; manual: boolean }>();
   for (const n of notes)
     for (const nt of n.note_topics ?? []) {
-      const t = one(nt.topics as { id: string; name: string; slug: string; color: string | null; emoji: string | null } | null);
-      if (t) topicCount.set(t.slug, { t, n: (topicCount.get(t.slug)?.n ?? 0) + 1 });
+      const t = one(nt.topics as TopicRow | null);
+      if (t) topicCount.set(t.slug, { t, n: (topicCount.get(t.slug)?.n ?? 0) + 1, manual: false });
     }
+  for (const row of manualTopics.data ?? []) {
+    const t = one(row.topics as unknown as TopicRow | null);
+    if (t) topicCount.set(t.slug, { t, n: topicCount.get(t.slug)?.n ?? 0, manual: true });
+  }
   const topics = [...topicCount.values()].sort((a, b) => b.n - a.n);
+  const freeTopics = (allTopics ?? []).filter((t) => ![...topicCount.values()].some((c) => c.t.id === t.id));
 
-  // Pessoas envolvidas: quem tem tarefa no projeto
-  const involvement = new Map<string, { name: string; slug: string; open: number; done: number; est: number; spent: number }>();
+  // Pessoas envolvidas: quem tem tarefa no projeto, mais as ligadas à mão
+  type Involved = { id: string; name: string; slug: string; open: number; done: number; est: number; spent: number; manual: boolean };
+  const involvement = new Map<string, Involved>();
   for (const t of real)
     for (const a of t.task_assignees) {
       if (!a.people) continue;
-      const cur = involvement.get(a.people.slug) ?? { name: a.people.name, slug: a.people.slug, open: 0, done: 0, est: 0, spent: 0 };
+      const cur = involvement.get(a.people.slug) ?? { id: a.people.id, name: a.people.name, slug: a.people.slug, open: 0, done: 0, est: 0, spent: 0, manual: false };
       if (t.status === "done") cur.done++;
       else cur.open++;
       cur.est += Number(t.estimate_hours ?? 0);
       cur.spent += Number(t.spent_hours ?? 0);
       involvement.set(a.people.slug, cur);
     }
+  for (const row of manualPeople.data ?? []) {
+    const p = one(row.people as unknown as { id: string; name: string; slug: string } | null);
+    if (!p) continue;
+    const cur = involvement.get(p.slug) ?? { ...p, open: 0, done: 0, est: 0, spent: 0, manual: true };
+    involvement.set(p.slug, { ...cur, manual: true });
+  }
+  const freePeople = (people ?? []).filter((p) => ![...involvement.values()].some((i) => i.id === p.id));
 
   const est = real.reduce((s, t) => s + Number(t.estimate_hours ?? 0), 0);
   const spent = real.reduce((s, t) => s + Number(t.spent_hours ?? 0), 0);
@@ -280,32 +312,61 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
 
         <aside className="flex flex-col gap-7">
           <SystemLinks supabase={supabase} type="project" id={project.id} title="Sistemas do projeto" />
-          {involvement.size > 0 && (
-            <section>
-              <h2 className="mb-2 text-base font-semibold">Pessoas</h2>
+          <section>
+            <h2 className="mb-2 text-base font-semibold">Pessoas</h2>
+            {involvement.size ? (
               <ul className="flex flex-col gap-1.5 text-sm">
                 {[...involvement.values()].map((p) => (
-                  <li key={p.slug} className="flex items-baseline justify-between gap-2">
+                  <li key={p.slug} className="group flex items-baseline justify-between gap-2">
                     <Link href={`/people/${p.slug}`} className="font-medium text-ink hover:underline">{p.name}</Link>
-                    <span className="text-xs text-faint">
-                      {p.open} abertas · {p.done} feitas · {hours(p.spent)}/{hours(p.est)}
+                    <span className="flex items-baseline gap-1 text-xs text-faint">
+                      {p.open || p.done ? `${p.open} abertas · ${p.done} feitas · ${hours(p.spent)}/${hours(p.est)}` : "sem tarefas"}
+                      {p.manual && (
+                        <form action={unlinkProjectPerson.bind(null, project.id, p.id)}>
+                          <button
+                            className="px-1 text-faint hover:text-rec can-hover:opacity-0 can-hover:group-hover:opacity-100 focus:opacity-100"
+                            aria-label={`Tirar ${p.name} do projeto`}
+                            title={p.open || p.done ? "Tira a ligação manual; a pessoa continua aqui enquanto tiver tarefas" : undefined}
+                          >
+                            ×
+                          </button>
+                        </form>
+                      )}
                     </span>
                   </li>
                 ))}
               </ul>
-            </section>
-          )}
+            ) : (
+              <p className="text-sm text-faint">Nenhuma ainda.</p>
+            )}
+            {manualReady && (
+              <LinkForm action={linkProjectPerson.bind(null, project.id)} field="person_id" options={freePeople} what="pessoa" placeholder={freePeople.length ? "Adicionar uma pessoa…" : "Todas já estão aqui"} />
+            )}
+          </section>
 
-          {topics.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-base font-semibold">Temas</h2>
+          <section>
+            <h2 className="mb-2 text-base font-semibold">Temas</h2>
+            {topics.length ? (
               <div className="flex flex-wrap gap-2">
-                {topics.map(({ t, n }) => (
-                  <TopicChip key={t.slug} topic={t} count={n} />
+                {topics.map(({ t, n, manual }) => (
+                  <TopicChip key={t.slug} topic={t} count={n || undefined}>
+                    {manual && (
+                      <form action={unlinkProjectTopic.bind(null, project.id, t.id)} className="-mr-1.5">
+                        <button className="px-1 text-faint hover:text-rec" aria-label={`Tirar ${t.name} do projeto`}>×</button>
+                      </form>
+                    )}
+                  </TopicChip>
                 ))}
               </div>
-            </section>
-          )}
+            ) : (
+              <p className="text-sm text-faint">Nenhum ainda.</p>
+            )}
+            {manualReady ? (
+              <LinkForm action={linkProjectTopic.bind(null, project.id)} field="topic_id" options={freeTopics} what="tema" placeholder={freeTopics.length ? "Adicionar um tema…" : "Todos já estão aqui"} />
+            ) : (
+              <p className="mt-2 text-xs text-faint">Para adicionar pessoas e temas à mão, rode de novo o supabase/schema.sql no Supabase.</p>
+            )}
+          </section>
 
           <section>
             <h2 className="mb-2 text-base font-semibold">Notas e gravações</h2>
@@ -346,6 +407,22 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
         </aside>
       </div>
     </div>
+  );
+}
+
+/** Escolher um existente ou escrever um nome novo, como em “Sistemas do projeto”. */
+function LinkForm({ action, field, options, what, placeholder }: { action: (form: FormData) => Promise<void>; field: string; options: { id: string; name: string }[]; what: string; placeholder: string }) {
+  return (
+    <form action={action} className="mt-2 flex gap-2">
+      <select name={field} aria-label={`Adicionar ${what}`} defaultValue="" className="min-w-0 flex-1 rounded-md border border-line bg-panel px-2 py-1 text-sm">
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>{o.name}</option>
+        ))}
+      </select>
+      <input name="new_name" placeholder={what === "tema" ? "ou novo" : "ou nova"} aria-label={`${what === "tema" ? "Novo" : "Nova"} ${what}`} className="w-24 rounded-md border border-line bg-panel px-2 py-1 text-sm" />
+      <button className="press rounded-md bg-surface px-3 text-sm text-muted hover:text-ink">Ligar</button>
+    </form>
   );
 }
 
