@@ -764,3 +764,36 @@ create index if not exists knowledge_search_idx on public.knowledge using gin (s
 alter table public.knowledge enable row level security;
 drop policy if exists "own_rows" on public.knowledge;
 create policy "own_rows" on public.knowledge for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ---------------------------------------------------------------------
+-- Pessoas e temas ligados à mão a um projeto (além dos que já vêm das
+-- tarefas e das notas ligadas).
+-- ---------------------------------------------------------------------
+create table if not exists public.project_people (
+  project_id    uuid not null references public.projects(id) on delete cascade,
+  person_id     uuid not null references public.people(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  primary key (project_id, person_id)
+);
+create index if not exists project_people_person_idx on public.project_people (person_id);
+
+create table if not exists public.project_topics (
+  project_id    uuid not null references public.projects(id) on delete cascade,
+  topic_id      uuid not null references public.topics(id) on delete cascade,
+  user_id       uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  primary key (project_id, topic_id)
+);
+create index if not exists project_topics_topic_idx on public.project_topics (topic_id);
+
+do $$
+declare t text;
+begin
+  foreach t in array array['project_people', 'project_topics'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists "own_rows" on public.%I', t);
+    execute format(
+      'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
+  end loop;
+end $$;
