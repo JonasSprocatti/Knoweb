@@ -102,6 +102,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
   const blocking = deps(blocks);
   const subtasks = normalizeTasks(subs);
   const assigned = new Set(task.task_assignees.map((a) => a.people?.id));
+  const assigneeIds = (people ?? []).filter((p) => assigned.has(p.id)).map((p) => p.id);
   const cycle = cycleDays(task);
   const over = task.estimate_hours != null && task.spent_hours > task.estimate_hours;
 
@@ -133,27 +134,30 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           <StatusDot status={task.status} /> {task.title}
         </h1>
 
+        {/* Depois de salvar, o React volta o formulário ao começo. Select e responsáveis não acompanham
+            o valor novo vindo do servidor e voltavam ao de quando a tela abriu (e o próximo salvamento
+            desfazia a edição): a chave com o valor salvo recria o campo já com ele. */}
         <form action={saveTask} className="flex flex-col gap-3 rounded-lg border border-line bg-panel p-4">
           <input type="hidden" name="id" value={task.id} />
           <input type="hidden" name="assignees_present" value="1" />
           <input name="title" required defaultValue={task.title} aria-label="Título" className={`${input} text-base`} />
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Status">
-              <select name="status" defaultValue={task.status} className={input}>
+              <select key={task.status} name="status" defaultValue={task.status} className={input}>
                 {Object.entries(TASK_STATUS).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
               </select>
             </Field>
             <Field label="Prioridade">
-              <select name="priority" defaultValue={task.priority} className={input}>
+              <select key={task.priority} name="priority" defaultValue={task.priority} className={input}>
                 {Object.entries(PRIORITY).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
             </Field>
             <Field label="Projeto">
-              <select name="project_id" defaultValue={task.project_id ?? ""} className={input}>
+              <select key={task.project_id ?? ""} name="project_id" defaultValue={task.project_id ?? ""} className={input}>
                 <option value="">Sem projeto</option>
                 {(projects ?? []).map((p) => (
                   <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
@@ -164,7 +168,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               <input type="date" name="due_date" defaultValue={task.due_date ?? ""} className={input} />
             </Field>
             <Field label="Sprint">
-              <select name="sprint_id" defaultValue={task.sprint_id ?? ""} className={input}>
+              <select key={task.sprint_id ?? ""} name="sprint_id" defaultValue={task.sprint_id ?? ""} className={input}>
                 <option value="">Backlog (sem sprint)</option>
                 {(sprints ?? []).map((s) => (
                   <option key={s.id} value={s.id}>{s.name}</option>
@@ -172,7 +176,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               </select>
             </Field>
             <Field label="Repetir">
-              <select name="recurrence" defaultValue={task.recurrence ?? ""} className={input}>
+              <select key={task.recurrence ?? ""} name="recurrence" defaultValue={task.recurrence ?? ""} className={input}>
                 <option value="">Não repete</option>
                 {Object.entries(RECURRENCE).map(([k, v]) => (
                   <option key={k} value={k}>↻ {v}</option>
@@ -188,7 +192,7 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
           </div>
           <div className="flex flex-col gap-1 text-sm">
             <span className="text-xs text-faint">Responsáveis</span>
-            <AssigneePicker people={people ?? []} defaultIds={(people ?? []).filter((p) => assigned.has(p.id)).map((p) => p.id)} />
+            <AssigneePicker key={assigneeIds.join(",")} people={people ?? []} defaultIds={assigneeIds} />
           </div>
           <textarea name="description" defaultValue={task.description} rows={5} placeholder="Detalhes, critérios de pronto, links…" aria-label="Descrição" className={input} />
           <div className="flex items-center justify-between">
