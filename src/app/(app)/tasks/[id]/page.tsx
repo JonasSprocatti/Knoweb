@@ -1,6 +1,7 @@
 import Link from "@/components/Link";
 import { SystemLinks } from "@/components/SystemLinks";
 import { SaveButton } from "@/components/SaveButton";
+import { AssigneePicker } from "@/components/AssigneePicker";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import { addComment, addDependency, deleteComment, deleteTask, logTime, removeDependency, saveTask } from "@/lib/work-actions";
@@ -185,16 +186,10 @@ export default async function TaskPage({ params }: { params: Promise<{ id: strin
               <input name="spent_hours" inputMode="decimal" defaultValue={task.spent_hours ?? 0} className={input} />
             </Field>
           </div>
-          <fieldset className="flex flex-wrap items-center gap-2 text-sm">
-            <legend className="mb-1 text-xs text-faint">Responsáveis</legend>
-            {(people ?? []).map((p) => (
-              <label key={p.id} className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1 has-checked:border-accent has-checked:text-accent">
-                <input type="checkbox" name="assignee" value={p.id} defaultChecked={assigned.has(p.id)} className="accent-accent" />
-                {p.is_me ? `Eu (${p.name})` : p.name}
-              </label>
-            ))}
-            <input name="new_assignees" placeholder="+ pessoa nova (vírgula para várias)" aria-label="Novos responsáveis" className={`${input} w-64`} />
-          </fieldset>
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-xs text-faint">Responsáveis</span>
+            <AssigneePicker people={people ?? []} defaultIds={(people ?? []).filter((p) => assigned.has(p.id)).map((p) => p.id)} />
+          </div>
           <textarea name="description" defaultValue={task.description} rows={5} placeholder="Detalhes, critérios de pronto, links…" aria-label="Descrição" className={input} />
           <div className="flex items-center justify-between">
             <SaveButton />
