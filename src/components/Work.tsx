@@ -284,7 +284,7 @@ export function QuickTask({
           ))}
         </select>
       )}
-      <AssigneePicker people={people} />
+      <AssigneePicker people={people} className="w-full sm:w-64" />
       <input type="date" name="due_date" aria-label="Prazo" className={input} />
       <input name="estimate_hours" inputMode="decimal" placeholder="horas" aria-label="Estimativa em horas" className={`${input} w-20`} />
       <select name="priority" aria-label="Prioridade" defaultValue="medium" className={input}>
