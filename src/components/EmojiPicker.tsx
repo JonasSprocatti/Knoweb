@@ -2,52 +2,38 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-/** Emojis por grupo; depois de cada emoji, palavras para a busca (separadas por espaço). */
-const GROUPS: { name: string; icon: string; items: string }[] = [
-  {
-    name: "Trabalho",
-    icon: "💼",
-    items: `💼 trabalho maleta negocio|📁 pasta arquivo projeto|📂 pasta aberta|🗂️ divisorias organizar|📋 prancheta lista modelo|📌 alfinete fixar|📎 clipe anexo|📊 grafico barras relatorio|📈 grafico alta crescimento|📉 grafico queda|🗓️ calendario agenda|📅 calendario data prazo|⏰ alarme despertador prazo|⏱️ cronometro tempo|⌛ ampulheta espera|✅ feito concluido ok|☑️ marcado tarefa|📝 nota escrever memorando|✏️ lapis editar|🖊️ caneta|📄 documento pagina|📑 abas documentos|📦 caixa entrega pacote|🏷️ etiqueta tag rotulo|🔖 marcador|💰 dinheiro saco financeiro|💵 dinheiro nota|💳 cartao pagamento|🧾 recibo nota fiscal|🏦 banco|🏢 empresa predio escritorio|🏭 fabrica industria|🤝 acordo parceria aperto|📣 anuncio marketing|📢 alto falante aviso|🎯 alvo meta objetivo|🏆 trofeu vitoria|🥇 medalha primeiro|🚀 foguete lancamento|⚖️ balanca juridico lei|🛒 carrinho compras|🧮 abaco contas calculo`,
-  },
-  {
-    name: "Tecnologia",
-    icon: "💻",
-    items: `💻 notebook computador|🖥️ monitor desktop|⌨️ teclado|🖱️ mouse|📱 celular mobile|☎️ telefone|🔌 tomada integracao|🔋 bateria|💾 disquete salvar|💿 disco|🗄️ arquivo gaveta|🗃️ fichario|🌐 internet web global|☁️ nuvem cloud|🔗 link corrente conexao|🔒 cadeado seguranca|🔑 chave acesso senha|🛡️ escudo protecao seguranca|🐛 bug inseto erro|⚙️ engrenagem configuracao sistema|🔧 chave ferramenta manutencao|🛠️ ferramentas|🔩 parafuso|🧰 caixa ferramentas|🤖 robo ia automacao|🧠 cerebro ia ideia|🧪 teste experimento|🔬 microscopio pesquisa|📡 antena sinal|🛰️ satelite|🔍 lupa busca pesquisa|💡 lampada ideia|🧩 quebra cabeca peca integracao|🗝️ chave antiga|📶 sinal rede|🖨️ impressora`,
-  },
-  {
-    name: "Pessoas",
-    icon: "🙂",
-    items: `🙂 sorriso feliz|😀 feliz rindo|😎 legal oculos|🤔 pensando duvida|😴 sono|😅 ufa|🥳 festa comemorar|😍 amor|😢 triste|😡 bravo raiva|🤯 cabeca explodindo|👍 joinha ok|👎 negativo|👏 palmas|🙏 obrigado por favor|💪 forca|✌️ paz|👋 ola tchau|👀 olhos ver|👤 pessoa usuario|👥 pessoas grupo equipe|🧑‍💻 programador dev|👩‍💼 executiva|👨‍💼 executivo|🧑‍🏫 professor aula|🧑‍🎨 artista|🧑‍🔬 cientista|🧑‍⚕️ saude medico|👶 bebe|👪 familia|🗣️ falar conversa reuniao|💬 conversa mensagem chat|💭 pensamento|❤️ coracao amor|🔥 fogo urgente quente|⭐ estrela favorito|✨ brilho novo|💯 cem perfeito`,
-  },
-  {
-    name: "Natureza",
-    icon: "🌿",
-    items: `🌿 folha planta|🌱 broto inicio crescer|🌳 arvore|🌲 pinheiro|🌵 cacto|🌸 flor|🌻 girassol|🍀 trevo sorte|🍁 outono folha|🌊 onda mar|🔥 fogo|💧 gota agua|⚡ raio energia rapido|🌙 lua noite|☀️ sol dia|🌈 arco iris|❄️ neve frio|🌍 terra mundo|🌎 americas mundo|🪐 planeta espaco|🌌 galaxia|🐶 cachorro|🐱 gato|🦊 raposa|🐻 urso|🐼 panda|🦉 coruja sabedoria|🐝 abelha|🦋 borboleta|🐢 tartaruga devagar|🐙 polvo|🐬 golfinho|🦁 leao|🐞 joaninha|🕸️ teia aranha`,
-  },
-  {
-    name: "Comida",
-    icon: "🍎",
-    items: `🍎 maca fruta|🍌 banana|🍇 uva|🍓 morango|🍉 melancia|🍋 limao|🥑 abacate|🥕 cenoura|🌽 milho|🍞 pao|🧀 queijo|🍕 pizza|🍔 hamburguer|🌮 taco|🍣 sushi|🍝 macarrao|🍰 bolo|🍫 chocolate|🍪 biscoito|🍿 pipoca|☕ cafe|🍵 cha|🍺 cerveja|🍷 vinho|🥤 refrigerante|🍽️ prato refeicao`,
-  },
-  {
-    name: "Atividades",
-    icon: "⚽",
-    items: `⚽ futebol|🏀 basquete|🎾 tenis|🏐 volei|🏋️ academia treino|🚴 bicicleta|🏃 corrida|🧘 meditacao yoga|🎮 videogame jogo|🎲 dado jogo|♟️ xadrez estrategia|🎨 arte pintura design|🎬 filme cinema video|🎵 musica|🎧 fone podcast|🎤 microfone gravacao|📷 camera foto|📚 livros estudo|📖 livro leitura|🎓 formatura curso|✈️ aviao viagem|🚗 carro|🏠 casa|🏖️ praia ferias|⛺ acampamento|🗺️ mapa|🧭 bussola direcao|🎁 presente|🎉 festa|🎈 balao`,
-  },
-  {
-    name: "Símbolos",
-    icon: "🔷",
-    items: `🔴 vermelho circulo|🟠 laranja|🟡 amarelo|🟢 verde|🔵 azul|🟣 roxo|⚫ preto|⚪ branco|🟥 quadrado vermelho|🟧 quadrado laranja|🟨 quadrado amarelo|🟩 quadrado verde|🟦 quadrado azul|🟪 quadrado roxo|🔷 losango azul|🔶 losango laranja|❗ exclamacao importante|❓ pergunta|⚠️ alerta aviso|🚫 proibido|⛔ bloqueado|♻️ reciclar recorrente|🔁 repetir|🔄 atualizar sincronizar|➕ mais adicionar|➖ menos|✖️ fechar|🆕 novo|🆗 ok|🔝 topo|⬆️ cima|⬇️ baixo|➡️ direita proximo|⬅️ esquerda|📍 local pino|🏁 bandeira chegada fim|🚩 bandeira alerta|🇧🇷 brasil bandeira`,
-  },
-];
+type Entry = { emoji: string; words: string };
+type Group = { name: string; icon: string; entries: Entry[] };
 
-const ALL = GROUPS.flatMap((g) =>
-  g.items.split("|").map((entry) => {
-    const [emoji, ...words] = entry.trim().split(" ");
-    return { emoji, words: words.join(" ") };
-  }),
-);
 const plain = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+// O catálogo (~1.900 emojis) só é baixado quando alguém abre o seletor
+let catalog: Promise<Group[]> | null = null;
+const loadCatalog = () =>
+  (catalog ??= import("@/lib/emojis").then(({ EMOJI_GROUPS }) =>
+    EMOJI_GROUPS.map((g) => ({
+      name: g.name,
+      icon: g.icon,
+      entries: g.items.split("|").map((entry) => {
+        const i = entry.indexOf(" ");
+        return { emoji: entry.slice(0, i), words: ` ${entry.slice(i + 1)}` };
+      }),
+    })),
+  ));
+
+const RECENT_KEY = "knoweb:emojis-recentes";
+const readRecent = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+};
+const saveRecent = (emoji: string) => {
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify([emoji, ...readRecent().filter((e) => e !== emoji)].slice(0, 24)));
+  } catch {}
+};
 
 /**
  * Campo de emoji para formulários: um botão abre o seletor (grupos + busca) e o
@@ -67,10 +53,13 @@ export function EmojiPicker({
   className?: string;
 }) {
   const [value, setValue] = useState(defaultValue ?? "");
-  const [group, setGroup] = useState(0);
+  const [groups, setGroups] = useState<Group[] | null>(null);
+  const [recent, setRecent] = useState<string[]>([]);
+  const [group, setGroup] = useState<number | null>(null); // null = aba padrão
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDetailsElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const grid = useRef<HTMLDivElement>(null);
 
   // Fecha ao tocar fora ou com Esc
   useEffect(() => {
@@ -88,27 +77,60 @@ export function EmojiPicker({
     };
   }, []);
 
-  const shown = useMemo(() => {
-    const q = plain(query.trim());
-    if (!q) return GROUPS[group].items.split("|").map((e) => e.trim().split(" ")[0]);
-    return [...new Set(ALL.filter((e) => plain(e.words).includes(q)).map((e) => e.emoji))];
-  }, [group, query]);
+  // Abas: "Recentes" (se houver) e depois os grupos do catálogo
+  const tabs = useMemo(() => {
+    const list: Group[] = groups ?? [];
+    return recent.length ? [{ name: "Recentes", icon: "🕘", entries: recent.map((emoji) => ({ emoji, words: "" })) }, ...list] : list;
+  }, [groups, recent]);
+  const active = group ?? 0;
+  const current = tabs[Math.min(active, tabs.length - 1)];
+
+  // Cada palavra digitada precisa começar alguma palavra do emoji ("sol" acha ☀️, não "consolo")
+  const results = useMemo(() => {
+    const terms = plain(query.trim()).split(/[^a-z0-9]+/).filter(Boolean);
+    if (!terms.length || !groups) return null;
+    // As palavras vêm na ordem nome → etiquetas, então achar mais cedo = mais relevante
+    const seen = new Set<string>();
+    const found: { emoji: string; at: number }[] = [];
+    for (const g of groups)
+      for (const e of g.entries) {
+        if (seen.has(e.emoji)) continue;
+        const at = terms.map((t) => e.words.indexOf(` ${t}`));
+        if (at.some((i) => i < 0)) continue;
+        seen.add(e.emoji);
+        found.push({ emoji: e.emoji, at: Math.max(...at) });
+      }
+    return found.sort((a, b) => a.at - b.at).map((f) => f.emoji);
+  }, [groups, query]);
+
+  const shown = results ?? current?.entries.map((e) => e.emoji) ?? [];
 
   function pick(emoji: string) {
     setValue(emoji);
     setQuery("");
+    if (emoji) saveRecent(emoji);
     if (ref.current) ref.current.open = false;
+  }
+
+  function choose(i: number) {
+    setGroup(i);
+    grid.current?.scrollTo({ top: 0 });
   }
 
   // Busca: se o texto já for um emoji (colado ou do teclado do sistema), Enter usa ele mesmo
   const typedEmoji = /\p{Extended_Pictographic}/u.test(query) ? query.trim() : "";
+  const same = (a: string, b: string) => a.replace(/\uFE0F/g, "") === b.replace(/\uFE0F/g, "");
 
   return (
     <details
       ref={ref}
       className={`relative ${className}`}
       onToggle={(e) => {
-        if ((e.currentTarget as HTMLDetailsElement).open && window.matchMedia("(pointer: fine)").matches) search.current?.focus();
+        if (!(e.currentTarget as HTMLDetailsElement).open) return;
+        setRecent(readRecent());
+        setGroup(null);
+        loadCatalog().then(setGroups);
+        if (window.matchMedia("(pointer: fine)").matches) search.current?.focus();
       }}
     >
       <input type="hidden" name={name} value={value} />
@@ -119,7 +141,7 @@ export function EmojiPicker({
       >
         {value || <span className="opacity-40 grayscale">{placeholder}</span>}
       </summary>
-      <div className="absolute left-0 z-30 mt-1 flex w-72 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-line bg-panel p-2 shadow-xl">
+      <div className="absolute left-0 z-30 mt-1 flex w-[23rem] max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-line bg-panel p-2 shadow-xl">
         <input
           ref={search}
           value={query}
@@ -127,33 +149,37 @@ export function EmojiPicker({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault(); // não envia o formulário
-              const first = typedEmoji || shown[0];
+              const first = typedEmoji || (results ?? [])[0];
               if (first) pick(first);
             }
           }}
-          placeholder="Buscar (ex.: banco, ideia) ou colar"
+          placeholder="Buscar (ex.: banco, ideia, viagem) ou colar"
           aria-label="Buscar emoji"
           className="rounded-md border border-line bg-bg px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none"
         />
-        {!query && (
-          <div className="flex justify-between" role="tablist" aria-label="Grupos de emoji">
-            {GROUPS.map((g, i) => (
+        {!query && tabs.length > 0 && (
+          <div className="-mx-0.5 flex justify-between gap-0.5 overflow-x-auto overscroll-contain pb-0.5 [scrollbar-width:none]" role="tablist" aria-label="Grupos de emoji">
+            {tabs.map((g, i) => (
               <button
                 key={g.name}
                 type="button"
                 role="tab"
-                aria-selected={group === i}
+                aria-selected={active === i}
+                aria-label={g.name}
                 title={g.name}
-                onClick={() => setGroup(i)}
-                className={`rounded-md px-1.5 py-1 text-base leading-none transition ${group === i ? "bg-surface" : "opacity-60 hover:opacity-100"}`}
+                onClick={() => choose(i)}
+                className={`shrink-0 rounded-md px-1 py-1 text-base leading-none transition ${active === i ? "bg-surface" : "opacity-55 hover:opacity-100"}`}
               >
                 {g.icon}
               </button>
             ))}
           </div>
         )}
-        <div className="grid max-h-52 grid-cols-8 gap-0.5 overflow-y-auto overscroll-contain">
-          {typedEmoji && !shown.includes(typedEmoji) && (
+        <p className="px-1 text-xs text-muted">
+          {!groups ? "Carregando emojis…" : results ? `${results.length} ${results.length === 1 ? "resultado" : "resultados"}` : current?.name}
+        </p>
+        <div ref={grid} className="grid max-h-60 grid-cols-8 sm:grid-cols-9 gap-0.5 overflow-y-auto overscroll-contain">
+          {typedEmoji && !shown.some((e) => same(e, typedEmoji)) && (
             <button type="button" onClick={() => pick(typedEmoji)} className="rounded-md p-1 text-xl leading-none hover:bg-surface" title="Usar este">
               {typedEmoji}
             </button>
@@ -164,12 +190,14 @@ export function EmojiPicker({
               type="button"
               onClick={() => pick(e)}
               aria-label={e}
-              className={`rounded-md p-1 text-xl leading-none hover:bg-surface ${value === e ? "bg-accent/15 ring-1 ring-accent" : ""}`}
+              className={`rounded-md p-1 text-xl leading-none hover:bg-surface ${same(value, e) ? "bg-accent/15 ring-1 ring-accent" : ""}`}
             >
               {e}
             </button>
           ))}
-          {!shown.length && !typedEmoji && <p className="col-span-8 px-1 py-2 text-xs text-faint">Nada encontrado. Dá para colar qualquer emoji na busca.</p>}
+          {groups && results && !results.length && !typedEmoji && (
+            <p className="col-span-full px-1 py-2 text-xs text-faint">Nada encontrado. Dá para colar qualquer emoji na busca.</p>
+          )}
         </div>
         {value && (
           <button type="button" onClick={() => pick("")} className="self-start text-xs text-muted hover:text-ink hover:underline">
