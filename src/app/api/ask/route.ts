@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/supabase/server";
-import { anthropic, clip, CLAUDE_MODEL, excerpts, keywords } from "@/lib/server/claude";
+import { anthropic, clip, CLAUDE_SMART_MODEL, excerpts, keywords } from "@/lib/server/claude";
 import { aiProvider, geminiStream, GEMINI_MODEL } from "@/lib/server/gemini";
 import { embed, similarNotes } from "@/lib/server/embeddings";
 import { trackClaude, trackGemini } from "@/lib/server/usage";
@@ -157,7 +157,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
           return;
         }
         const response = anthropic().messages.stream({
-          model: CLAUDE_MODEL,
+          model: CLAUDE_SMART_MODEL,
           max_tokens: 32_000, // o raciocínio do modelo conta aqui dentro: com 2048 as respostas paravam no meio
           system: SYSTEM,
           messages,
@@ -168,7 +168,7 @@ ${n.summary ? `Resumo: ${n.summary}\n\n` : ""}${body}
           }
         }
         const final = await response.finalMessage();
-        await trackClaude(supabase, "ask", CLAUDE_MODEL, final.usage);
+        await trackClaude(supabase, "ask", CLAUDE_SMART_MODEL, final.usage);
         if (final.stop_reason === "max_tokens") send("\n\n*(A resposta passou do limite e foi cortada aqui. Peça para continuar.)*");
       } catch (err) {
         send(`\n\n**Erro:** ${err instanceof Error ? err.message : String(err)}`);

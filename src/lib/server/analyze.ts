@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { anthropic, cited, clip, CLAUDE_MODEL, plain } from "@/lib/server/claude";
+import { anthropic, cited, clip, CLAUDE_SMART_MODEL, plain } from "@/lib/server/claude";
 import { aiProvider, gemini, GEMINI_MODEL } from "@/lib/server/gemini";
 import { embed, noteText, saveEmbedding, similarNotes } from "@/lib/server/embeddings";
 import { trackClaude, trackGemini } from "@/lib/server/usage";
@@ -319,7 +319,7 @@ Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os 
       // análise depois do resumo (sem tarefas, temas nem pessoas). Streaming evita o timeout do SDK.
       const response = await anthropic()
         .messages.stream({
-          model: CLAUDE_MODEL,
+          model: CLAUDE_SMART_MODEL,
           max_tokens: 32_000,
           system: SYSTEM,
           tools: [ANALYSIS_TOOL],
@@ -338,7 +338,7 @@ Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os 
           ],
         })
         .finalMessage();
-      await trackClaude(supabase, "analyze", CLAUDE_MODEL, response.usage);
+      await trackClaude(supabase, "analyze", CLAUDE_SMART_MODEL, response.usage);
       // Análise cortada no meio não é salva: a nota fica com erro e dá para reanalisar
       if (response.stop_reason === "max_tokens") throw new Error("A análise ficou longa demais e saiu cortada. Tente reanalisar.");
       const calls = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === ANALYSIS_TOOL.name);
