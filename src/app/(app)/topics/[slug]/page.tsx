@@ -2,12 +2,13 @@ import Link from "@/components/Link";
 import { EmojiPicker } from "@/components/EmojiPicker";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
-import { NoteCard } from "@/components/NoteCard";
+import { NoteCard, withNoteColor } from "@/components/NoteCard";
+import { ColorPicker } from "@/components/ColorPicker";
 import { CoverPicker } from "@/components/CoverPicker";
 import { topicColor } from "@/lib/topicColor";
 import type { NoteListItem } from "@/lib/types";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
-import { deleteTopic, saveTopic } from "@/lib/work-actions";
+import { deleteTopic, saveTopic, setColor } from "@/lib/work-actions";
 import { SaveButton } from "@/components/SaveButton";
 
 export const dynamic = "force-dynamic";
@@ -19,14 +20,12 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
   const { data: topic } = await supabase.from("topics").select("id, name, slug, description, color, emoji, cover_path").eq("slug", slug).maybeSingle();
   if (!topic) notFound();
 
-  const { data: rows } = await supabase
-    .from("note_topics")
-    .select("relevance, notes(id, title, kind, status, summary, updated_at, duration_seconds, pinned, note_topics(relevance, topics(name, slug, color, emoji)))")
-    .eq("topic_id", topic.id)
-    .order("relevance", { ascending: false });
+  const { data: rows } = await withNoteColor((cols) =>
+    supabase.from("note_topics").select(`relevance, notes(${cols})`).eq("topic_id", topic.id).order("relevance", { ascending: false }),
+  );
 
-  const notes = (rows ?? [])
-    .map((r) => (Array.isArray(r.notes) ? r.notes[0] : r.notes) as unknown as NoteListItem | null)
+  const notes = ((rows ?? []) as unknown as { notes: NoteListItem | NoteListItem[] | null }[])
+    .map((r) => (Array.isArray(r.notes) ? r.notes[0] : r.notes))
     .filter((n): n is NoteListItem => !!n);
 
   // Temas que aparecem junto com este (vizinhos na teia)
@@ -58,7 +57,9 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
           Todos os temas
         </Link>
         <h1 className="display text-3xl md:text-4xl" >
-          <span className="mr-3 inline-block h-3 w-3 rounded-full align-middle" style={{ background: topicColor(topic) }} />
+          <ColorPicker defaultValue={topic.color} auto={topicColor({ slug: topic.slug })} autoHint="escolhida pelo nome" label="Cor do tema" onChange={setColor.bind(null, "topics", topic.id)} className="mr-1.5 p-1.5 align-middle">
+            <span className="h-3 w-3 rounded-full" style={{ background: topicColor(topic) }} />
+          </ColorPicker>
           {topic.emoji && <span className="mr-2">{topic.emoji}</span>}
           {topic.name}
         </h1>
@@ -76,10 +77,10 @@ export default async function TopicPage({ params }: { params: Promise<{ slug: st
                 Nome
                 <input name="name" required defaultValue={topic.name} className="rounded-md border border-line bg-panel px-2.5 py-1.5 text-sm text-ink" />
               </label>
-              <label className="flex w-16 flex-col gap-1 text-xs text-muted">
+              <div className="flex w-32 flex-col gap-1 text-xs text-muted" title="A cor da bolinha nas listas, das notas deste tema e na teia">
                 Cor
-                <input name="color" type="color" defaultValue={topicColor(topic)} className="h-[34px] w-full cursor-pointer rounded-md border border-line bg-panel p-0.5" />
-              </label>
+                <ColorPicker name="color" defaultValue={topic.color} auto={topicColor({ slug: topic.slug })} autoHint="escolhida pelo nome" label="Cor do tema" />
+              </div>
             </div>
             <label className="flex flex-col gap-1 text-xs text-muted">
               Descrição

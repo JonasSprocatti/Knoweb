@@ -2,11 +2,26 @@ import Link from "@/components/Link";
 import { Icon } from "@/components/Icon";
 import { formatDuration, relativeDate } from "@/lib/text";
 import { topicColor } from "@/lib/topicColor";
+import { NOTE_TYPE, noteType } from "@/lib/noteType";
 import type { NoteListItem } from "@/lib/types";
 
-/** Colunas das listas de notas, já com o tema principal de cada uma (para a cor). */
+/**
+ * Colunas das listas de notas: a cor escolhida, o tema principal (a cor automática)
+ * e quantos arquivos a nota tem (para o ícone de arquivo).
+ */
 export const LIST_COLUMNS =
-  "id, title, kind, status, summary, updated_at, duration_seconds, pinned, note_topics(relevance, topics(name, slug, color, emoji))";
+  "id, title, kind, status, summary, updated_at, duration_seconds, pinned, color, note_files(count), note_topics(relevance, topics(name, slug, color, emoji))";
+/** As mesmas, sem a cor da nota: enquanto o supabase/schema.sql novo não rodou no banco. */
+export const LIST_COLUMNS_NO_COLOR = LIST_COLUMNS.replace(" color,", "");
+
+/** Coluna que o banco ainda não tem (o schema.sql novo não rodou). */
+export const missingColumn = (error: { code?: string } | null) => error?.code === "42703";
+
+/** Roda a consulta com a cor da nota e, se o banco ainda não tem a coluna, sem ela. */
+export async function withNoteColor<R extends { error: { code?: string } | null }>(run: (columns: string) => PromiseLike<R>): Promise<R> {
+  const result = await run(LIST_COLUMNS);
+  return missingColumn(result.error) ? run(LIST_COLUMNS_NO_COLOR) : result;
+}
 
 const STATUS_LABEL: Record<string, string> = {
   recording: "gravando",
@@ -36,19 +51,22 @@ function mainTopic(note: NoteListItem): JoinedTopic | null {
   return rows[0]?.topic ?? null;
 }
 
-/** Uma nota numa lista: ponto na cor do tema, título, resumo e de onde ela veio. */
+/** A cor da nota: a escolhida por você ou, sem escolha, a do tema principal. */
+export function noteColor(note: NoteListItem): string {
+  const topic = mainTopic(note);
+  return note.color || (topic ? topicColor(topic) : "var(--faint)");
+}
+
+/** Uma nota numa lista: ícone do tipo na cor da nota, título, resumo e de onde ela veio. */
 export function NoteCard({ note, snippet }: { note: NoteListItem; snippet?: string | null }) {
   const topic = mainTopic(note);
-  const color = topic ? topicColor(topic) : "var(--faint)";
-  const recording = note.kind === "recording";
+  const color = noteColor(note);
+  const type = noteType({ kind: note.kind, files: note.note_files?.[0]?.count });
+  const recording = type === "recording";
   return (
     <Link href={`/notes/${note.id}`} className="group -mx-3 flex gap-3 rounded-xl px-3 py-3 transition hover:bg-panel">
-      <span className="mt-[0.45rem] flex h-3 w-3 shrink-0 items-center justify-center" aria-hidden>
-        {recording ? (
-          <span className="h-3 w-3 rounded-full border-2" style={{ borderColor: color }} />
-        ) : (
-          <span className="h-2.5 w-2.5 rounded-full" style={{ background: color }} />
-        )}
+      <span className="mt-[0.2rem] shrink-0" style={{ color }} title={NOTE_TYPE[type].label}>
+        <Icon name={NOTE_TYPE[type].icon} className="h-[1.05rem] w-[1.05rem]" />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <h3 className="line-clamp-2 font-medium leading-snug text-ink">
@@ -66,8 +84,8 @@ export function NoteCard({ note, snippet }: { note: NoteListItem; snippet?: stri
           note.summary && <p className="line-clamp-2 text-sm text-muted">{note.summary}</p>
         )}
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-          {topic && <span style={{ color: `color-mix(in srgb, ${color} 60%, var(--ink))` }}>{topic.name}</span>}
-          <span>{recording ? (note.duration_seconds > 0 ? `gravação de ${formatDuration(note.duration_seconds)}` : "gravação") : "escrita"}</span>
+          {topic && <span style={{ color: `color-mix(in srgb, ${topicColor(topic)} 60%, var(--ink))` }}>{topic.name}</span>}
+          <span>{recording ? (note.duration_seconds > 0 ? `gravação de ${formatDuration(note.duration_seconds)}` : "gravação") : type === "file" ? "arquivo" : "escrita"}</span>
           <span>{relativeDate(note.updated_at)}</span>
           <StatusBadge status={note.status} />
         </p>

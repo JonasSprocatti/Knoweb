@@ -24,6 +24,8 @@ const PATHS: Record<string, string> = {
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
   sprint: "M4 12a8 8 0 1 0 2.3-5.7M4 4v4h4M12 8v4l3 2",
   wave: "M3 12h2m3-5v10m4-13v16m4-11v6m4-3h1",
+  write: "M5 20h3L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17zM14 20h6",
+  file: "M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm7 0v5h5",
   book: "M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2zm0 15a2 2 0 0 0 2 2h12v-4M9 7h6",
 };
 

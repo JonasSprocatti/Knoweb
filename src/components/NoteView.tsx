@@ -15,6 +15,9 @@ import { StatusBadge } from "@/components/NoteCard";
 import { WikiEditor } from "@/components/WikiEditor";
 import { Transcript } from "@/components/Transcript";
 import { TopicChip } from "@/components/TopicChip";
+import { ColorPicker } from "@/components/ColorPicker";
+import { NOTE_TYPE, noteType } from "@/lib/noteType";
+import { topicColor } from "@/lib/topicColor";
 import { CoverPicker } from "@/components/CoverPicker";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
 import { deleteNote, noteToKnowledge } from "@/lib/work-actions";
@@ -230,6 +233,22 @@ export function NoteView({
     else setFiles((prev) => prev.filter((x) => x.id !== f.id));
   }
 
+  const [colorError, setColorError] = useState<string | null>(null);
+  async function changeColor(color: string | null) {
+    const before = note.color ?? null;
+    setColorError(null);
+    setNote((n) => ({ ...n, color }));
+    await api.updateNote(note.id, { color }).catch((err) => {
+      setNote((n) => ({ ...n, color: before }));
+      setColorError(err instanceof Error ? err.message : "Não deu para salvar a cor.");
+    });
+  }
+
+  // Ícone do tipo e cor automática (a do tema mais forte), como nas listas
+  const type = noteType({ kind: note.kind, files: files.length });
+  const mainTopic = [...topics].sort((a, b) => b.relevance - a.relevance)[0];
+  const autoColor = mainTopic ? topicColor(mainTopic) : "var(--faint)";
+
   async function togglePin() {
     const pinned = !note.pinned;
     setNote((n) => ({ ...n, pinned }));
@@ -315,10 +334,15 @@ export function NoteView({
           </a>
         )}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-faint">
-          <Icon name={note.kind === "recording" ? "wave" : "notes"} className={`h-4 w-4 ${note.kind === "recording" ? "text-rec" : ""}`} />
+          <ColorPicker defaultValue={note.color} auto={autoColor} autoHint={mainTopic ? `a do tema ${mainTopic.name}` : "sem tema, fica cinza"} label="Cor da nota" onChange={changeColor} className="-m-1.5 p-1.5">
+            <span style={{ color: note.color || autoColor }}>
+              <Icon name={NOTE_TYPE[type].icon} className="h-[1.05rem] w-[1.05rem]" />
+            </span>
+          </ColorPicker>
           <span>
-            {note.kind === "recording" ? "Gravação" : "Nota"} criada {relativeDate(note.created_at)}
+            {type === "recording" ? "Gravação criada" : type === "file" ? "Nota de arquivo criada" : "Nota criada"} {relativeDate(note.created_at)}
           </span>
+          {colorError && <span className="text-rec">{colorError}</span>}
           {note.duration_seconds > 0 && <span>{formatDuration(note.duration_seconds)} de áudio</span>}
           <StatusBadge status={note.status} />
           <span className="ml-auto flex items-center gap-1">

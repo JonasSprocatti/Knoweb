@@ -42,13 +42,17 @@ export interface Note {
   insights: Insights;
   duration_seconds: number;
   pinned: boolean;
+  /** Cor escolhida para a nota; null = a do tema principal */
+  color?: string | null;
   cover_path?: string | null;
   analyzed_at: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export type NoteListItem = Pick<Note, "id" | "title" | "kind" | "status" | "summary" | "updated_at" | "duration_seconds" | "pinned"> & {
+export type NoteListItem = Pick<Note, "id" | "title" | "kind" | "status" | "summary" | "updated_at" | "duration_seconds" | "pinned" | "color"> & {
+  /** Quantos arquivos a nota tem, quando a consulta traz (nota de arquivo) */
+  note_files?: { count: number }[];
   /** Temas da nota, quando a consulta traz (usado para a cor) */
   note_topics?: { relevance: number; topics: unknown }[];
 };

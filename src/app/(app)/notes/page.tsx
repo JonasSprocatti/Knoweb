@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";
+import { NoteCard, withNoteColor } from "@/components/NoteCard";
 import { NewNoteButton } from "@/components/NewNoteButton";
 import type { NoteListItem } from "@/lib/types";
 
@@ -20,17 +20,17 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
   const perPage = 30;
   const supabase = await supabaseServer();
 
-  let query = supabase
-    .from("notes")
-    .select(LIST_COLUMNS, { count: "exact" })
-    .order("updated_at", { ascending: false })
-    .range((page - 1) * perPage, page * perPage - 1);
-
-  if (tipo === "gravacoes") query = query.eq("kind", "recording");
-  if (tipo === "escritas") query = query.eq("kind", "note");
-  if (tipo === "sem-analise") query = query.is("analyzed_at", null);
-
-  const { data, count } = await query;
+  const { data, count } = await withNoteColor((cols) => {
+    let query = supabase
+      .from("notes")
+      .select(cols, { count: "exact" })
+      .order("updated_at", { ascending: false })
+      .range((page - 1) * perPage, page * perPage - 1);
+    if (tipo === "gravacoes") query = query.eq("kind", "recording");
+    if (tipo === "escritas") query = query.eq("kind", "note");
+    if (tipo === "sem-analise") query = query.is("analyzed_at", null);
+    return query;
+  });
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / perPage));
 
   return (
@@ -62,7 +62,7 @@ export default async function NotesPage({ searchParams }: { searchParams: Promis
         <p className="py-6 text-muted">Nenhuma nota neste filtro. Escreva uma nova ou grave uma conversa.</p>
       ) : (
         <div className="grid gap-x-10 lg:grid-cols-2">
-          {(data as NoteListItem[]).map((n) => (
+          {(data as unknown as NoteListItem[]).map((n) => (
             <NoteCard key={n.id} note={n} />
           ))}
         </div>

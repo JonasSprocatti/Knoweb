@@ -1,5 +1,7 @@
 import Link from "@/components/Link";
 import { EmojiPicker } from "@/components/EmojiPicker";
+import { ColorPicker } from "@/components/ColorPicker";
+import { topicColor } from "@/lib/topicColor";
 import { PersonSelect } from "@/components/PersonSelect";
 import { ReanalyzeNotes } from "@/components/ReanalyzeNotes";
 import { ProjectDocWriter } from "@/components/ProjectDocWriter";
@@ -16,6 +18,7 @@ import {
   linkProjectPerson,
   linkProjectTopic,
   saveProject,
+  setColor,
   setProjectStatus,
   templateFromProject,
   unlinkNote,
@@ -142,7 +145,9 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           Todos os projetos
         </Link>
         <h1 className="display flex items-center gap-3 text-3xl md:text-4xl">
-          <span className="h-3 w-3 rounded-full" style={{ background: color }} aria-hidden />
+          <ColorPicker defaultValue={project.color} auto={topicColor({ slug: project.slug })} autoHint="escolhida pelo nome" label="Cor do projeto" onChange={setColor.bind(null, "projects", project.id)} className="-m-1.5 p-1.5">
+            <span className="h-3 w-3 rounded-full" style={{ background: color }} />
+          </ColorPicker>
           {project.emoji} {project.name}
         </h1>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
@@ -202,6 +207,10 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
                   Nome
                   <input name="name" required defaultValue={project.name} className={input} />
                 </label>
+                <div className="flex w-32 flex-col gap-1 text-xs text-muted" title="A cor da bolinha nas listas, nas tarefas e na teia">
+                  Cor
+                  <ColorPicker name="color" defaultValue={project.color} auto={topicColor({ slug: project.slug })} autoHint="escolhida pelo nome" label="Cor do projeto" />
+                </div>
               </div>
               <label className="flex flex-col gap-1 text-xs text-muted">
                 Objetivo
