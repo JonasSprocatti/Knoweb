@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { api, debounce } from "@/lib/api";
 import { pickMimeType, requestWakeLock } from "@/lib/audio";
 import { finishRecording, requestTranscription, uploadSegment } from "@/lib/upload";
+import {
+  backupChunk,
+  backupDropRecording,
+  backupDropSegment,
+  backupStart,
+  holdRecordingLock,
+  RESCUE_EVENT,
+} from "@/lib/recordingBackup";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { defaultRecordingTitle, formatDuration } from "@/lib/text";
 import type { AudioSegment } from "@/lib/types";
@@ -59,6 +67,13 @@ export function Recorder({ userId }: { userId: string }) {
   const [meeting, setMeeting] = useState(false);
   const [canCaptureSystem, setCanCaptureSystem] = useState(false);
   const cleanupRef = useRef<(() => void) | null>(null);
+  const releaseLockRef = useRef<(() => void) | null>(null);
+  const stoppingRef = useRef(false);
+  const leftRef = useRef(false); // a tela Gravar saiu de cena (outro link, voltar do navegador)
+  const phaseRef = useRef<Phase>("idle");
+  phaseRef.current = phase;
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  const leaveDialog = useRef<HTMLDialogElement>(null);
 
   // Som do sistema só existe no navegador do computador (Chrome/Edge)
   useEffect(() => {
@@ -134,7 +149,7 @@ export function Recorder({ userId }: { userId: string }) {
       const id = noteIdRef.current;
       if (!id) return;
       // Pedaços vazios (ex.: parou logo após trocar) são descartados
-      if (blob.size < 1024 || (durationSeconds < 0.5 && seq > 0)) return;
+      if (blob.size < 1024 || (durationSeconds < 0.5 && seq > 0)) return backupDropSegment(id, seq);
 
       const mime = mimeRef.current || blob.type;
       setLocal((prev) => [...prev, { seq, durationSeconds, state: "uploading", blob, mime }]);
@@ -142,6 +157,7 @@ export function Recorder({ userId }: { userId: string }) {
       const insert = uploadSegment({ userId, noteId: id, seq, blob, mime, durationSeconds })
         .then((segmentId) => {
           failedRef.current.delete(seq);
+          backupDropSegment(id, seq);
           setLocal((prev) =>
             prev.map((s) => (s.seq === seq ? { ...s, state: "uploaded", segmentId, blob: undefined } : s)),
           );
@@ -166,9 +182,14 @@ export function Recorder({ userId }: { userId: string }) {
     const seq = seqRef.current++;
     const startMs = activeMs();
     segmentStartMsRef.current = startMs;
+    const noteId = noteIdRef.current;
+    let idx = 0;
 
     rec.ondataavailable = (e) => {
-      if (e.data && e.data.size > 0) chunks.push(e.data);
+      if (!e.data || e.data.size === 0) return;
+      chunks.push(e.data);
+      // Cópia no aparelho a cada segundo: o trecho só sobe ao fechar 5 min
+      if (noteId) backupChunk(noteId, seq, idx++, e.data, activeMs() - startMs);
     };
     rec.onstop = () => {
       const blob = new Blob(chunks, { type: rec.mimeType || mimeRef.current || "audio/webm" });
@@ -262,12 +283,20 @@ export function Recorder({ userId }: { userId: string }) {
         };
       }
       mimeRef.current = pickMimeType();
+      if (leftRef.current) {
+        // Saiu da tela enquanto escolhia o microfone ou a tela: não começa uma gravação que ninguém vê
+        cleanupRef.current?.();
+        return;
+      }
 
       const initialTitle = title.trim() || defaultRecordingTitle();
       const note = await api.createNote({ title: initialTitle, content: liveNotes, kind: "recording", status: "recording" });
       noteIdRef.current = note.id;
       setNoteId(note.id);
       setTitle(note.title);
+      // O lock vem antes da cópia: assim a recuperação nunca pega uma gravação que está acontecendo
+      releaseLockRef.current = holdRecordingLock(note.id);
+      backupStart({ noteId: note.id, userId, mime: mimeRef.current || "audio/webm" });
 
       wakeLockRef.current = await requestWakeLock();
       startMeter(stream);
@@ -311,7 +340,8 @@ export function Recorder({ userId }: { userId: string }) {
 
   async function stop() {
     const id = noteIdRef.current;
-    if (!id) return;
+    if (!id || stoppingRef.current) return;
+    stoppingRef.current = true;
     setPhase("stopping");
 
     const rec = recorderRef.current;
@@ -336,7 +366,8 @@ export function Recorder({ userId }: { userId: string }) {
     saveNotes.flush(id, { title, content: liveNotes });
     await Promise.allSettled(insertsRef.current);
     if (failedRef.current.size > 0) {
-      // Não finaliza: o áudio que não subiu só existe nesta aba.
+      if (leftRef.current) return handOver();
+      // Não finaliza: o áudio que não subiu está nesta aba (e na cópia do aparelho).
       setPhase("unsent");
       return;
     }
@@ -347,24 +378,72 @@ export function Recorder({ userId }: { userId: string }) {
     const id = noteIdRef.current;
     if (!id) return;
     setPhase("stopping");
+    // Trechos que não subiram continuam na cópia do aparelho e sobem sozinhos quando der
+    if (failedRef.current.size === 0) await backupDropRecording(id);
+    releaseLockRef.current?.();
     // Não espera: se tudo já foi transcrito, a análise roda nessa chamada e pode levar alguns segundos.
     finishRecording(id).catch(() => undefined);
-    router.push(`/notes/${id}`);
+    if (failedRef.current.size > 0) window.dispatchEvent(new Event(RESCUE_EVENT));
+    if (!leftRef.current) router.push(`/notes/${id}`);
   }
 
+  /** Saiu da tela com trechos que não subiram: solta a gravação para a recuperação enviar a cópia do aparelho. */
+  function handOver() {
+    releaseLockRef.current?.();
+    window.dispatchEvent(new Event(RESCUE_EVENT));
+  }
+
+  // ---- Saiu da tela Gravar no meio (link, voltar do navegador) -------
+  // Antes a gravação ficava presa em "gravando" e o trecho atual se perdia. Agora ela é encerrada e enviada.
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
+  useEffect(() => {
+    leftRef.current = false;
+    return () => {
+      leftRef.current = true;
+      const p = phaseRef.current;
+      if (p === "recording" || p === "paused") void stopRef.current();
+      else if (p === "unsent") handOver();
+    };
+  }, []);
+
+  // Pergunta antes de um link do app tirar você da tela durante a gravação
+  useEffect(() => {
+    if (phase !== "recording" && phase !== "paused") return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download")) return;
+      const url = new URL(a.href, location.href);
+      if (url.origin !== location.origin || url.pathname === location.pathname) return;
+      e.preventDefault();
+      e.stopPropagation(); // na captura da janela: o next/link nem chega a ver o clique
+      setLeaveTo(url.pathname + url.search + url.hash);
+    };
+    window.addEventListener("click", onClick, true);
+    return () => window.removeEventListener("click", onClick, true);
+  }, [phase]);
+
+  useEffect(() => {
+    if (leaveTo) leaveDialog.current?.showModal();
+    else leaveDialog.current?.close();
+  }, [leaveTo]);
+
   async function retry(seg: LocalSegment) {
-    if (!seg.blob || !noteIdRef.current) return;
+    const id = noteIdRef.current;
+    if (!seg.blob || !id) return;
     setLocal((prev) => prev.map((s) => (s.seq === seg.seq ? { ...s, state: "uploading" } : s)));
     try {
       const segmentId = await uploadSegment({
         userId,
-        noteId: noteIdRef.current,
+        noteId: id,
         seq: seg.seq,
         blob: seg.blob,
         mime: seg.mime,
         durationSeconds: seg.durationSeconds,
       });
       failedRef.current.delete(seg.seq);
+      backupDropSegment(id, seg.seq);
       setLocal((prev) => prev.map((s) => (s.seq === seg.seq ? { ...s, state: "uploaded", segmentId, blob: undefined } : s)));
       requestTranscription(segmentId).catch(() => undefined);
     } catch {
@@ -448,7 +527,10 @@ export function Recorder({ userId }: { userId: string }) {
           {phase === "stopping" && <p className="text-sm text-muted">Finalizando e enviando o áudio…</p>}
           {phase === "unsent" && (
             <div className="flex flex-col items-center gap-3 text-center">
-              <p className="text-sm text-rec">Alguns trechos não subiram (conexão?). Reenvie abaixo antes de sair.</p>
+              <p className="text-sm text-rec">Alguns trechos não subiram (conexão?). Reenvie abaixo.</p>
+              <p className="max-w-sm text-xs text-muted">
+                Se finalizar agora, eles ficam guardados neste aparelho e sobem sozinhos quando a conexão voltar.
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
                 <button onClick={downloadFailed} className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink hover:border-accent">
                   Baixar trechos pendentes
@@ -545,6 +627,55 @@ export function Recorder({ userId }: { userId: string }) {
           <FileUpload userId={userId} />
         </section>
       )}
+
+      <dialog
+        ref={leaveDialog}
+        onClose={() => setLeaveTo(null)}
+        onClick={(e) => e.target === leaveDialog.current && setLeaveTo(null)}
+        className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-lg border border-line bg-panel p-0 text-ink shadow-xl backdrop:bg-black/40"
+      >
+        <div className="flex flex-col gap-4 p-5">
+          <h2 className="text-lg font-semibold">Você está gravando</h2>
+          <p className="text-sm text-muted">
+            Sair desta tela encerra a gravação: o áudio até aqui é enviado e transcrito.
+            {canCaptureSystem && " Para consultar outra tela sem parar, abra em outra janela."}
+          </p>
+          {/* No celular os botões empilham com "Continuar gravando" em cima */}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            {canCaptureSystem && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (leaveTo) window.open(leaveTo, "_blank");
+                  setLeaveTo(null);
+                }}
+                className="rounded-md px-3 py-1.5 text-sm text-muted hover:text-ink"
+              >
+                Abrir em outra janela
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                const to = leaveTo;
+                setLeaveTo(null);
+                if (to) router.push(to); // a tela sai e a gravação é encerrada e enviada (efeito de saída acima)
+              }}
+              className="rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-rec hover:text-rec"
+            >
+              Parar e sair
+            </button>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => setLeaveTo(null)}
+              className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-on-accent"
+            >
+              Continuar gravando
+            </button>
+          </div>
+        </div>
+      </dialog>
     </div>
   );
 }
