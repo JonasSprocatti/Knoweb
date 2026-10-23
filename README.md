@@ -92,6 +92,7 @@ As rotas de transcrição e análise pedem até 300 s de execução (`maxDuratio
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave pública (anon) do Supabase |
 | `ANTHROPIC_API_KEY` | Chave da API do Claude |
 | `ANTHROPIC_MODEL` | Modelo usado (padrão `claude-sonnet-5-5`; use `claude-haiku-5-5` para economizar ou `claude-opus-5-5` para análises mais profundas) |
+| `ANTHROPIC_SMART_MODEL` | Modelo da análise de notas/gravações e do Perguntar (padrão `claude-sonnet-5-5`; `claude-opus-5-5` é mais capaz e custa o dobro) |
 | `OPENAI_API_KEY` | Chave da OpenAI para o Whisper |
 | `OPENAI_TRANSCRIBE_MODEL` | Padrão `whisper-1` (o único que devolve marcas de tempo por trecho) |
 | `TRANSCRIBE_LANGUAGE` | Idioma das gravações, padrão `pt` |

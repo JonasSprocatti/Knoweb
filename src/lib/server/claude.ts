@@ -1,6 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 export const CLAUDE_MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5";
+/** Modelo mais forte, só para a análise de notas/gravações e o Perguntar. */
+export const CLAUDE_SMART_MODEL = process.env.ANTHROPIC_SMART_MODEL || "claude-sonnet-5-5";
 
 let client: Anthropic | null = null;
 export function anthropic() {
