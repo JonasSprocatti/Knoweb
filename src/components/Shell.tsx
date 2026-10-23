@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { NewNoteButton } from "@/components/NewNoteButton";
+import { RecordingRescue } from "@/components/RecordingRescue";
 
 const NAV = [
   { href: "/", label: "Início", icon: "home" },
@@ -215,6 +216,8 @@ export function Shell({ email, ai, children }: { email: string; ai: string | nul
           </button>
         </div>
       </nav>
+
+      <RecordingRescue />
 
       {/* ---------------- Gaveta "Mais" (celular) ---------------- */}
       <dialog

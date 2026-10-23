@@ -5,6 +5,14 @@ import { api } from "@/lib/api";
 import { baseMime, extensionFor, MAX_UPLOAD_BYTES, readAudioDuration } from "@/lib/audio";
 import { fileKind, MAX_DOC_BYTES, MAX_IMAGE_BYTES, UNSUPPORTED, type FileKind, type NoteFile } from "@/lib/files";
 
+/** Envio parado (conexão caída sem erro) não pode deixar a tela em "enviando" para sempre. */
+function withTimeout<T>(p: PromiseLike<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("O envio demorou demais.")), ms);
+    Promise.resolve(p).then(resolve, reject).finally(() => clearTimeout(t));
+  });
+}
+
 async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
@@ -34,14 +42,15 @@ export async function uploadSegment(opts: {
   const supabase = supabaseBrowser();
   const mime = baseMime(opts.mime || opts.blob.type);
   const path = `${opts.userId}/${opts.noteId}/${String(opts.seq).padStart(4, "0")}.${extensionFor(mime)}`;
+  const limit = 60_000 + opts.blob.size / 50; // 1 min + 20 s por MB
 
   await withRetry(async () => {
-    const { error } = await supabase.storage.from("audio").upload(path, opts.blob, { contentType: mime, upsert: true });
+    const { error } = await withTimeout(supabase.storage.from("audio").upload(path, opts.blob, { contentType: mime, upsert: true }), limit);
     if (error) throw error;
   });
 
   return withRetry(async () => {
-    const { data, error } = await supabase
+    const insert = supabase
       .from("audio_segments")
       .upsert(
         {
@@ -56,6 +65,7 @@ export async function uploadSegment(opts: {
       )
       .select("id")
       .single();
+    const { data, error } = await withTimeout(insert, 30_000);
     if (error) throw error;
     return data.id as string;
   });

@@ -14,6 +14,7 @@ import { Icon } from "@/components/Icon";
 import { StatusBadge } from "@/components/NoteCard";
 import { WikiEditor } from "@/components/WikiEditor";
 import { Transcript } from "@/components/Transcript";
+import { StuckRecording } from "@/components/StuckRecording";
 import { TopicChip } from "@/components/TopicChip";
 import { ColorPicker } from "@/components/ColorPicker";
 import { NOTE_TYPE, noteType } from "@/lib/noteType";
@@ -414,6 +415,8 @@ export function NoteView({
           </div>
         )}
 
+        {note.kind === "recording" && <StuckRecording note={note} segments={segments} />}
+
         {/* Título quebra em várias linhas (cresce com o texto); Enter não cria linha nova */}
         <textarea
           value={title}
@@ -547,7 +550,7 @@ export function NoteView({
           <Transcript
             segments={segments}
             transcript={note.transcript ?? ""}
-            processing={processing}
+            processing={note.status === "transcribing"}
             onRetry={retrySegment}
           />
         )}

@@ -2,7 +2,7 @@
 
 Um meio-termo entre Notion e Obsidian: você grava conversas (no PC ou no celular), escreve notas em markdown, e o Claude resume, separa os temas e liga tudo numa teia de conhecimento que você navega por grafo, por tema ou perguntando.
 
-- **Gravar** no navegador do desktop ou do celular. O áudio sobe em pedaços de 5 min e é transcrito pelo Whisper enquanto você ainda fala.
+- **Gravar** no navegador do desktop ou do celular. O áudio sobe em pedaços de 5 min e é transcrito pelo Whisper enquanto você ainda fala. O trecho em andamento também fica guardado no aparelho: se a tela fechar no meio, ele sobe na próxima vez que o Knoweb abrir.
 - **Escrever** notas em markdown, com `[[links]]` no estilo Obsidian (autocompleta ao digitar `[[`) e backlinks.
 - **Analisar com o Claude**: título, resumo, pontos-chave, próximos passos, decisões, pessoas, temas e notas relacionadas. Roda sozinho no fim de cada gravação.
 - **Navegar** pela teia (grafo interativo), pelos temas, pela busca de texto completo ou perguntando ao Claude com citações das suas notas.
