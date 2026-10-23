@@ -1,11 +1,12 @@
 import Link from "@/components/Link";
-import { unlinkEntity, acceptSuggested, deleteProject, moveNoteTasks, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
+import { unlinkEntity, deleteProject, moveNoteTasks, removeMention, resolvePending, saveProject, setProjectStatus } from "@/lib/work-actions";
 import { normalizeTasks, one, projectColor, QuickTask, TASK_COLUMNS, TaskList } from "@/components/Work";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EntityKind, Insights, PendingCreations } from "@/lib/types";
 import { ENTITY } from "@/lib/entities";
 import { Icon } from "@/components/Icon";
 import { Markdown } from "@/components/Markdown";
+import { SuggestionBulk, SuggestionsProvider } from "@/components/Suggestions";
 
 type P = { id: string; name: string; slug: string; emoji: string | null; color: string | null; status: string; reason: string | null };
 
@@ -218,25 +219,25 @@ export async function NoteWork({
         </details>
       </section>
 
-      <section>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">Tarefas</h2>
-          {suggestedCount > 0 && (
-            <form action={acceptSuggested.bind(null, "note_id", noteId)}>
-              <button className="rounded bg-accent px-2.5 py-0.5 text-xs font-semibold text-on-accent">Aceitar {suggestedCount} sugeridas</button>
-            </form>
-          )}
-        </div>
-        <div className="text-sm">
-          <TaskList tasks={tasks} showProject empty="Nenhuma tarefa. O Claude sugere ao analisar." />
-        </div>
-        <details className="mt-1 text-sm">
-          <summary className="cursor-pointer text-muted hover:text-ink">+ Nova tarefa desta nota</summary>
-          <div className="mt-2">
-            <QuickTask projects={projects ?? []} people={people ?? []} noteId={noteId} projectId={linked.length === 1 ? linked[0].id : undefined} />
+      <SuggestionsProvider>
+        <section>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">Tarefas</h2>
+            {suggestedCount > 0 && (
+              <SuggestionBulk by="note_id" ownerId={noteId} ids={suggestedTasks.map((t) => t.id)} size="xs" showCount />
+            )}
           </div>
-        </details>
-      </section>
+          <div className="text-sm">
+            <TaskList tasks={tasks} showProject empty="Nenhuma tarefa. O Claude sugere ao analisar." />
+          </div>
+          <details className="mt-1 text-sm">
+            <summary className="cursor-pointer text-muted hover:text-ink">+ Nova tarefa desta nota</summary>
+            <div className="mt-2">
+              <QuickTask projects={projects ?? []} people={people ?? []} noteId={noteId} projectId={linked.length === 1 ? linked[0].id : undefined} />
+            </div>
+          </details>
+        </section>
+      </SuggestionsProvider>
 
       {versions.length > 0 && (
         <section>
