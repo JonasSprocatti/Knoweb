@@ -3,7 +3,8 @@ import { SaveButton } from "@/components/SaveButton";
 import { StatusPicker } from "@/components/StatusPicker";
 import { TASK_STATUS } from "@/lib/taskStatus";
 import { AssigneePicker } from "@/components/AssigneePicker";
-import { deleteTask, saveTask, setTaskStatus } from "@/lib/work-actions";
+import { saveTask } from "@/lib/work-actions";
+import { SuggestedRow, SuggestionButtons } from "@/components/Suggestions";
 import { topicColor } from "@/lib/topicColor";
 import type { Person, Project, ProjectStatus, Recurrence, TaskPriority, TaskRow, TaskStatus } from "@/lib/types";
 
@@ -103,8 +104,9 @@ export function StatusSelect({ id, status }: { id: string; status: TaskStatus })
 
 export function TaskItem({ task, showProject = true }: { task: TaskRow; showProject?: boolean }) {
   const overdue = task.due_date && isOpen(task.status) && task.due_date < today();
-  return (
-    <li className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 transition-opacity last:border-0 ${task.status === "done" || task.status === "canceled" ? "opacity-70" : ""}`}>
+  const className = `flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line py-2.5 transition-opacity last:border-0 ${task.status === "done" || task.status === "canceled" ? "opacity-70" : ""}`;
+  const body = (
+    <>
       {/* Em lista estreita (celular, coluna lateral) o título ocupa a linha inteira; as etiquetas vão para a linha de baixo */}
       <span className="flex min-w-0 basis-full items-center gap-3 @lg:basis-0 @lg:flex-1">
         <StatusDot status={task.status} />
@@ -132,22 +134,18 @@ export function TaskItem({ task, showProject = true }: { task: TaskRow; showProj
       {task.due_date && <span className={`text-xs tabular-nums ${overdue ? "font-semibold text-rec" : "text-faint"}`}>{formatDay(task.due_date)}</span>}
       {task.status === "suggested" ? (
         // Sugestão do Claude: aceita ou descarta uma a uma, antes de "aceitar todas"
-        <span className="flex items-center gap-1">
-          <form action={setTaskStatus.bind(null, task.id, "todo")}>
-            <button className="press rounded-full border border-[#2F9D6B]/50 bg-[#2F9D6B]/10 px-2.5 py-0.5 text-xs font-medium text-[#2F9D6B]" title="Aceitar esta tarefa">
-              ✓ Aceitar
-            </button>
-          </form>
-          <form action={deleteTask.bind(null, task.id, null)}>
-            <button className="press rounded-full border border-line px-2.5 py-0.5 text-xs text-muted hover:border-rec hover:text-rec" title="Descartar esta sugestão">
-              × Descartar
-            </button>
-          </form>
-        </span>
+        <SuggestionButtons id={task.id} />
       ) : (
         <StatusSelect id={task.id} status={task.status} />
       )}
-    </li>
+    </>
+  );
+  return task.status === "suggested" ? (
+    <SuggestedRow id={task.id} className={className}>
+      {body}
+    </SuggestedRow>
+  ) : (
+    <li className={className}>{body}</li>
   );
 }
 
