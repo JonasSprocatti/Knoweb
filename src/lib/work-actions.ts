@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireUser } from "@/lib/supabase/server";
 import { deleteNotes } from "@/lib/server/deleteNotes";
 import { slugify } from "@/lib/text";
+import { cleanColor } from "@/lib/topicColor";
 import type { Insights, TemplateTask } from "@/lib/types";
 
 /** Projetos, tarefas e pessoas: ações chamadas direto dos formulários. */
@@ -65,6 +66,8 @@ export async function saveProject(form: FormData) {
     start_date: str(form, "start_date"),
     due_date: str(form, "due_date"),
     owner_id: str(form, "new_owner_id") ? await personByName(supabase, str(form, "new_owner_id")!) : str(form, "owner_id"),
+    // Só o formulário de edição tem a cor; vazio = automática (a do nome)
+    ...(form.has("color") ? { color: cleanColor(form.get("color")) } : {}),
   };
   const saved = id
     ? must(await supabase.from("projects").update(row).eq("id", id).select("slug").single())
@@ -82,6 +85,13 @@ export async function saveProject(form: FormData) {
   }
   refresh();
   redirect(`/projects/${saved.slug}`);
+}
+
+/** Troca só a cor (a bolinha do título); null = automática. */
+export async function setColor(table: "projects" | "topics", id: string, color: string | null) {
+  const supabase = await db();
+  must(await supabase.from(table).update({ color: cleanColor(color) }).eq("id", id));
+  refresh();
 }
 
 /** Cria as tarefas do modelo no projeto; o prazo conta a partir do início. */
@@ -750,13 +760,12 @@ export async function saveTopic(id: string, form: FormData) {
   const supabase = await db();
   const name = str(form, "name");
   if (!name) throw new Error("Escreva o nome.");
-  const color = str(form, "color");
   const row = {
     name,
     slug: await freeSlug(supabase, "topics", name, id),
     emoji: str(form, "emoji")?.slice(0, 8) ?? null,
     description: str(form, "description"),
-    color: color && /^#[0-9a-f]{6}$/i.test(color) ? color : null,
+    color: cleanColor(form.get("color")),
   };
   const saved = must(await supabase.from("topics").update(row).eq("id", id).select("slug").single());
   refresh();

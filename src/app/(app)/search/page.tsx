@@ -1,6 +1,6 @@
 import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
-import { NoteCard } from "@/components/NoteCard";
+import { NoteCard, withNoteColor } from "@/components/NoteCard";
 import type { NoteListItem } from "@/lib/types";
 
 export const metadata = { title: "Busca" };
@@ -13,6 +13,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const supabase = await supabaseServer();
 
   let hits: Hit[] = [];
+  let full = new Map<string, NoteListItem>();
   let topics: { name: string; slug: string }[] = [];
   if (q.trim()) {
     const [{ data }, { data: t }, { data: byTitle }] = await Promise.all([
@@ -25,6 +26,11 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
       seen.has(h.id) ? false : (seen.add(h.id), true),
     );
     topics = t ?? [];
+    // Tema, cor, arquivos e duração de cada resultado, para o cartão ficar igual ao da lista
+    if (hits.length) {
+      const { data: rows } = await withNoteColor((cols) => supabase.from("notes").select(cols).in("id", hits.map((h) => h.id)));
+      full = new Map(((rows ?? []) as unknown as NoteListItem[]).map((n) => [n.id, n]));
+    }
   }
 
   return (
@@ -63,7 +69,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             {hits.map((h) => (
               <NoteCard
                 key={h.id}
-                note={{ ...h, status: "ready", duration_seconds: 0, pinned: false } as NoteListItem}
+                note={full.get(h.id) ?? ({ ...h, status: "ready", duration_seconds: 0, pinned: false } as NoteListItem)}
                 snippet={h.snippet}
               />
             ))}

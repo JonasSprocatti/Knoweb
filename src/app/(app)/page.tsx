@@ -1,7 +1,7 @@
 import Link from "@/components/Link";
 import { supabaseServer } from "@/lib/supabase/server";
 import { QuickCapture } from "@/components/QuickCapture";
-import { LIST_COLUMNS, NoteCard } from "@/components/NoteCard";
+import { NoteCard, withNoteColor } from "@/components/NoteCard";
 import { TopicChip } from "@/components/TopicChip";
 import { Icon } from "@/components/Icon";
 import { normalizeTasks, TASK_COLUMNS, TaskList } from "@/components/Work";
@@ -13,8 +13,8 @@ export default async function HomePage() {
   const supabase = await supabaseServer();
 
   const [{ data: pinned }, { data: recent }, { data: topics }, { data: withActions }, { data: openTasks }, { count: sugProjects }, { count: sugTasks }, { data: me }] = await Promise.all([
-    supabase.from("notes").select(LIST_COLUMNS).eq("pinned", true).order("updated_at", { ascending: false }).limit(6),
-    supabase.from("notes").select(LIST_COLUMNS).order("updated_at", { ascending: false }).limit(9),
+    withNoteColor((cols) => supabase.from("notes").select(cols).eq("pinned", true).order("updated_at", { ascending: false }).limit(6)),
+    withNoteColor((cols) => supabase.from("notes").select(cols).order("updated_at", { ascending: false }).limit(9)),
     supabase.from("topics").select("id, name, slug, color, emoji, note_topics(count)").limit(200),
     supabase
       .from("notes")
@@ -91,7 +91,7 @@ export default async function HomePage() {
         <section>
           <SectionTitle>Fixadas</SectionTitle>
           <div className="grid gap-x-8 sm:grid-cols-2">
-            {(pinned as NoteListItem[]).map((n) => (
+            {(pinned as unknown as NoteListItem[]).map((n) => (
               <NoteCard key={n.id} note={n} />
             ))}
           </div>
@@ -110,7 +110,7 @@ export default async function HomePage() {
             <EmptyState />
           ) : (
             <div className="flex flex-col">
-              {(recent as NoteListItem[]).map((n) => (
+              {(recent as unknown as NoteListItem[]).map((n) => (
                 <NoteCard key={n.id} note={n} />
               ))}
             </div>

@@ -14,7 +14,7 @@ export const api = {
       (r) => json<Note>(r),
     ),
 
-  updateNote: (id: string, body: { title?: string; content?: string; pinned?: boolean }) =>
+  updateNote: (id: string, body: { title?: string; content?: string; pinned?: boolean; color?: string | null }) =>
     fetch(`/api/notes/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },

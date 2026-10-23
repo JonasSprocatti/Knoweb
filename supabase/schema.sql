@@ -797,3 +797,9 @@ begin
       'create policy "own_rows" on public.%I for all using (user_id = auth.uid()) with check (user_id = auth.uid())', t);
   end loop;
 end $$;
+
+-- ---------------------------------------------------------------------
+-- Cor escolhida para a nota (o ícone nas listas e o ponto na teia).
+-- Vazia = automática, a cor do tema principal da nota.
+-- ---------------------------------------------------------------------
+alter table public.notes add column if not exists color text;

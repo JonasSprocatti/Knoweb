@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/supabase/server";
 import { serverError, unauthorized } from "@/lib/server/http";
-import { topicColor } from "@/lib/topicColor";
+import { cleanColor, topicColor } from "@/lib/topicColor";
 import type { GraphLink, GraphNode } from "@/lib/types";
 
 const NO_TOPIC_COLOR = "#D6CEC2";
@@ -20,7 +20,12 @@ export async function GET() {
   if (!user) return unauthorized();
 
   const [notes, topics, noteTopics, links, projects, tasks, people, projectNotes, assignees, notePeople, deps, sprints, entities, noteEntities, entityLinks] = await Promise.all([
-    supabase.from("notes").select("id, title, kind, created_at, cover_path").limit(3000),
+    // A cor escolhida da nota; sem a coluna (schema.sql novo não rodou), fica a do tema
+    supabase
+      .from("notes")
+      .select("id, title, kind, created_at, cover_path, color")
+      .limit(3000)
+      .then((r) => (r.error?.code === "42703" ? supabase.from("notes").select("id, title, kind, created_at, cover_path").limit(3000) : r)),
     supabase.from("topics").select("id, name, slug, color, emoji, cover_path, created_at"),
     supabase.from("note_topics").select("note_id, topic_id, relevance"),
     supabase.from("note_links").select("source_id, target_id, kind"),
@@ -116,7 +121,7 @@ export async function GET() {
         label: n.title as string,
         type: (n.kind === "recording" ? "recording" : "note") as GraphNode["type"],
         weight: degree.get(n.id as string) ?? 0,
-        color: (main && colorByTopic.get(main.topic)) || NO_TOPIC_COLOR,
+        color: cleanColor((n as { color?: string | null }).color) || (main && colorByTopic.get(main.topic)) || NO_TOPIC_COLOR,
         image: imageOf(n.cover_path as string | null),
         created_at: n.created_at as string,
       };

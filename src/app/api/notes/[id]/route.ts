@@ -3,10 +3,11 @@ import { deleteNotes } from "@/lib/server/deleteNotes";
 import { requireUser } from "@/lib/supabase/server";
 import { syncWikilinks } from "@/lib/server/links";
 import { serverError, unauthorized } from "@/lib/server/http";
+import { cleanColor } from "@/lib/topicColor";
 
 type Params = { params: Promise<{ id: string }> };
 
-/** Salva título/conteúdo/fixação e recalcula os [[wikilinks]]. */
+/** Salva título/conteúdo/fixação/cor e recalcula os [[wikilinks]]. */
 export async function PATCH(request: Request, { params }: Params) {
   const { id } = await params;
   const { supabase, user } = await requireUser();
@@ -16,11 +17,13 @@ export async function PATCH(request: Request, { params }: Params) {
     title?: string;
     content?: string;
     pinned?: boolean;
+    color?: string | null;
   };
   const update: Record<string, unknown> = {};
   if (typeof body.title === "string") update.title = body.title.trim().slice(0, 200) || "Sem título";
   if (typeof body.content === "string") update.content = body.content;
   if (typeof body.pinned === "boolean") update.pinned = body.pinned;
+  if (body.color !== undefined) update.color = cleanColor(body.color);
 
   const { data, error } = await supabase
     .from("notes")
@@ -28,6 +31,7 @@ export async function PATCH(request: Request, { params }: Params) {
     .eq("id", id)
     .select("id, title, updated_at")
     .single();
+  if (error?.code === "42703") return serverError(new Error("Para guardar a cor, rode de novo o supabase/schema.sql no Supabase."));
   if (error) return serverError(error);
 
   if (typeof body.content === "string") await syncWikilinks(supabase, id, body.content);
