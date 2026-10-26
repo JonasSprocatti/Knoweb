@@ -11,7 +11,6 @@ import { SaveButton } from "@/components/SaveButton";
 import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
 import {
-  acceptSuggested,
   createProjectDoc,
   deleteProject,
   linkNote,
@@ -48,6 +47,7 @@ import {
 import { TopicChip } from "@/components/TopicChip";
 import { ConfirmDelete, DeleteOption } from "@/components/ConfirmDelete";
 import { ProjectInbox } from "@/components/ProjectInbox";
+import { SuggestionBulk, SuggestionsProvider } from "@/components/Suggestions";
 import type { ProjectStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -278,15 +278,15 @@ export default async function ProjectPage({ params, searchParams }: { params: Pr
           </div>
 
           {suggested.length > 0 && (
-            <div className="rounded-lg border border-dashed border-accent/60 p-3">
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold">Sugeridas pelo Claude</h3>
-                <form action={acceptSuggested.bind(null, "project_id", project.id)}>
-                  <button className="rounded-md bg-accent px-3 py-1 text-sm font-semibold text-on-accent hover:brightness-110">Aceitar todas</button>
-                </form>
+            <SuggestionsProvider>
+              <div className="rounded-lg border border-dashed border-accent/60 p-3">
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold">Sugeridas pelo Claude</h3>
+                  <SuggestionBulk by="project_id" ownerId={project.id} ids={suggested.map((t) => t.id)} />
+                </div>
+                <TaskList tasks={suggested} showProject={false} />
               </div>
-              <TaskList tasks={suggested} showProject={false} />
-            </div>
+            </SuggestionsProvider>
           )}
 
           <QuickTask projects={projects ?? []} people={people ?? []} projectId={project.id} />

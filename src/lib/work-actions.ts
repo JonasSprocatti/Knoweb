@@ -286,6 +286,13 @@ export async function acceptSuggested(by: "note_id" | "project_id", id: string) 
   refresh();
 }
 
+/** Descarta (apaga) todas as tarefas sugeridas pelo Claude de uma nota ou de um projeto. */
+export async function discardSuggested(by: "note_id" | "project_id", id: string) {
+  const supabase = await db();
+  must(await supabase.from("tasks").delete().eq(by, id).eq("status", "suggested"));
+  refresh();
+}
+
 /** Exclui a tarefa; subtarefas vão junto ou viram tarefas soltas (subtasks = keep). */
 export async function deleteTask(id: string, back: string | null, form?: FormData) {
   const supabase = await db();
