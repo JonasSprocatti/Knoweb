@@ -343,8 +343,11 @@ Analise a nota e chame a ferramenta salvar_analise uma única vez, com todos os 
       if (response.stop_reason === "max_tokens") throw new Error("A análise ficou longa demais e saiu cortada. Tente reanalisar.");
       const calls = response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === ANALYSIS_TOOL.name);
       if (!calls.length) throw new Error("O Claude não devolveu a análise.");
-      result = mergeCalls(calls.map((c) => c.input as Partial<AnalysisResult>));
+      result = mergeCalls(calls.map((c) => normalizeAnalysis(c.input)));
     }
+
+    // O modelo às vezes manda uma lista como texto JSON, objeto solto ou nome em vez de objeto
+    result = normalizeAnalysis(result);
 
     // Sem nenhuma das listas, a análise veio pela metade: melhor dar erro do que salvar só o resumo
     if (!result.action_items && !result.topics && !result.people) throw new Error("A análise veio incompleta. Tente reanalisar.");
@@ -477,6 +480,75 @@ function mergeCalls(parts: Partial<AnalysisResult>[]): AnalysisResult {
       else if (prev === undefined || prev === null || prev === "") out[key] = value;
     }
   }
+  return out as unknown as AnalysisResult;
+}
+
+/** Campos de lista da análise: texto simples, ou objeto com o campo principal (para aceitar só o nome). */
+const STRING_LISTS = ["key_points", "decisions", "people", "questions"] as const;
+const OBJECT_LISTS = { action_items: "text", topics: "name", related_notes: "id", projects: "name", companies: "name", systems: "name" } as const;
+
+/** Desfaz texto JSON (`"[...]"` ou `"{...}"`); devolve o valor como está se não for JSON. */
+function unjson(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const t = value.trim();
+  if (!/^[[{]/.test(t)) return value;
+  try {
+    return JSON.parse(t);
+  } catch {
+    return value;
+  }
+}
+
+/** Transforma o que vier (lista, texto JSON, objeto solto, objeto que embrulha a lista, texto) em lista. */
+function asList(value: unknown, key?: string): unknown[] {
+  const v = unjson(value);
+  if (v === undefined || v === null || v === "") return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === "object") {
+    const obj = v as Record<string, unknown>;
+    // { "projects": [...] } ou { "items": [...] }: a lista veio embrulhada
+    const inner = (key && obj[key] !== undefined ? obj[key] : undefined) ?? Object.values(obj).find(Array.isArray);
+    if (Array.isArray(unjson(inner))) return unjson(inner) as unknown[];
+    return [obj];
+  }
+  return [v];
+}
+
+function asStringList(value: unknown, key?: string): string[] {
+  return asList(value, key)
+    .map((x) => {
+      const v = unjson(x);
+      if (typeof v === "string") return v;
+      if (typeof v === "number") return String(v);
+      if (v && typeof v === "object") {
+        const o = v as Record<string, unknown>;
+        const s = o.name ?? o.text ?? o.title;
+        return typeof s === "string" ? s : "";
+      }
+      return "";
+    })
+    .filter((s) => s.trim());
+}
+
+/** Garante o formato da análise antes de usar: listas viram listas, itens sem nome somem. */
+function normalizeAnalysis(raw: unknown): AnalysisResult {
+  const out = { ...((unjson(raw) as Record<string, unknown>) ?? {}) };
+  for (const key of STRING_LISTS) if (key in out) out[key] = asStringList(out[key], key);
+  for (const [key, main] of Object.entries(OBJECT_LISTS)) {
+    if (!(key in out)) continue;
+    out[key] = asList(out[key], key)
+      .map((item) => {
+        const v = unjson(item);
+        if (typeof v === "string") return { [main]: v };
+        if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+        const o = { ...(v as Record<string, unknown>) };
+        if (typeof o[main] !== "string") o[main] = typeof o[main] === "number" ? String(o[main]) : "";
+        for (const sub of ["assignees", "systems"]) if (sub in o) o[sub] = asStringList(o[sub]);
+        return o;
+      })
+      .filter((o): o is Record<string, string> => !!o && !!String(o[main]).trim());
+  }
+  for (const key of ["title", "summary"]) if (out[key] != null && typeof out[key] !== "string") out[key] = String(out[key]);
   return out as unknown as AnalysisResult;
 }
 
